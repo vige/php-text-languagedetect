@@ -1,0 +1,23 @@
+php-text-languagedetect (0.3.0-2.1) unstable; urgency=medium
+
+  * Non maintainer upload by the Reproducible Builds team.
+  * No source change upload to rebuild on buildd with .buildinfo files.
+
+ -- Holger Levsen <holger@debian.org>  Tue, 14 Jun 2022 15:16:06 +0200
+
+php-text-languagedetect (0.3.0-2) unstable; urgency=medium
+
+  * Team upload
+  * Use standard gbp layout
+  * Update Standards-Version to 3.9.7
+  * Document upstream VCS
+  * Make the package arch:all
+  * Rebuild with recent pkg-php-tools for the PHP 7.0 transition
+
+ -- David Prévot <taffit@debian.org>  Wed, 16 Mar 2016 16:25:46 -0400
+
+php-text-languagedetect (0.3.0-1) unstable; urgency=medium
+
+  * Initial release. (Closes: #746287)
+
+ -- Mathieu Parent <sathieu@debian.org>  Wed, 14 Jan 2015 21:47:18 +0100
