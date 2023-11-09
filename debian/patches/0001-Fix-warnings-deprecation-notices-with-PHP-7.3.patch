@@ -1,0 +1,3915 @@
+From: Christian Weiske <cweiske@cweiske.de>
+Date: Sun, 17 May 2020 11:36:13 +0200
+Subject: Fix warnings/deprecation notices with PHP 7.3+
+
+- Array and string offset access syntax with curly braces is deprecated
+- The each() function is deprecated.
+---
+ Text_LanguageDetect-0.3.0/Text/LanguageDetect.php  |   30 +-
+ .../Text/LanguageDetect.php.orig                   | 1708 ++++++++++++++++
+ .../tests/Text_LanguageDetectTest.php              |   11 +-
+ .../tests/Text_LanguageDetectTest.php.orig         | 2056 ++++++++++++++++++++
+ 4 files changed, 3787 insertions(+), 18 deletions(-)
+ create mode 100644 Text_LanguageDetect-0.3.0/Text/LanguageDetect.php.orig
+ create mode 100644 Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php.orig
+
+diff --git a/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php b/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php
+index 7cebbe6..bee44f6 100644
+--- a/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php
++++ b/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php
+@@ -204,7 +204,7 @@ class Text_LanguageDetect
+      */
+     function _get_data_loc($fname)
+     {
+-        if ($fname{0} == '/' || $fname{0} == '.') {
++        if ($fname[0] == '/' || $fname[0] == '.') {
+             // if filename starts with a slash, assume it's an absolute pathname
+             // and skip whatever is in $this->_data_dir
+             return $fname;
+@@ -1499,31 +1499,31 @@ class Text_LanguageDetect
+         case 1:
+             // normal ASCII-7 byte
+             // 0xxxxxxx -->  0xxxxxxx
+-            return ord($char{0});
++            return ord($char[0]);
+ 
+         case 2:
+             // 2 byte unicode
+             // 110zzzzx 10xxxxxx --> 00000zzz zxxxxxxx
+-            $z = (ord($char{0}) & 0x000001F) << 6;
+-            $x = (ord($char{1}) & 0x0000003F);
++            $z = (ord($char[0]) & 0x000001F) << 6;
++            $x = (ord($char[1]) & 0x0000003F);
+             return ($z | $x);
+ 
+         case 3:
+             // 3 byte unicode
+             // 1110zzzz 10zxxxxx 10xxxxxx --> zzzzzxxx xxxxxxxx
+-            $z =  (ord($char{0}) & 0x0000000F) << 12;
+-            $x1 = (ord($char{1}) & 0x0000003F) << 6;
+-            $x2 = (ord($char{2}) & 0x0000003F);
++            $z =  (ord($char[0]) & 0x0000000F) << 12;
++            $x1 = (ord($char[1]) & 0x0000003F) << 6;
++            $x2 = (ord($char[2]) & 0x0000003F);
+             return ($z | $x1 | $x2);
+ 
+         case 4:
+             // 4 byte unicode
+             // 11110zzz 10zzxxxx 10xxxxxx 10xxxxxx -->
+             // 000zzzzz xxxxxxxx xxxxxxxx
+-            $z1 = (ord($char{0}) & 0x00000007) << 18;
+-            $z2 = (ord($char{1}) & 0x0000003F) << 12;
+-            $x1 = (ord($char{2}) & 0x0000003F) << 6;
+-            $x2 = (ord($char{3}) & 0x0000003F);
++            $z1 = (ord($char[0]) & 0x00000007) << 18;
++            $z2 = (ord($char[1]) & 0x0000003F) << 12;
++            $x1 = (ord($char[2]) & 0x0000003F) << 6;
++            $x2 = (ord($char[3]) & 0x0000003F);
+             return ($z1 | $z2 | $x1 | $x2);
+         }
+     }
+@@ -1544,7 +1544,7 @@ class Text_LanguageDetect
+      */
+     static function _next_char($str, &$counter, $special_convert = false)
+     {
+-        $char = $str{$counter++};
++        $char = $str[$counter++];
+         $ord = ord($char);
+ 
+         // for a description of the utf8 system see
+@@ -1568,7 +1568,7 @@ class Text_LanguageDetect
+ 
+         } elseif ($ord >> 5 == 6) { // two-byte char
+             // multi-byte chars
+-            $nextchar = $str{$counter++}; // get next byte
++            $nextchar = $str[$counter++]; // get next byte
+ 
+             // lower-casing of non-ascii characters is still incomplete
+ 
+@@ -1610,12 +1610,12 @@ class Text_LanguageDetect
+         } elseif ($ord >> 4  == 14) { // three-byte char
+ 
+             // tag on next 2 bytes
+-            return $char . $str{$counter++} . $str{$counter++};
++            return $char . $str[$counter++] . $str[$counter++];
+ 
+         } elseif ($ord >> 3 == 30) { // four-byte char
+ 
+             // tag on next 3 bytes
+-            return $char . $str{$counter++} . $str{$counter++} . $str{$counter++};
++            return $char . $str[$counter++] . $str[$counter++] . $str[$counter++];
+ 
+         } else {
+             // error?
+diff --git a/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php.orig b/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php.orig
+new file mode 100644
+index 0000000..7cebbe6
+--- /dev/null
++++ b/Text_LanguageDetect-0.3.0/Text/LanguageDetect.php.orig
+@@ -0,0 +1,1708 @@
++<?php
++
++/**
++ * Detects the language of a given piece of text.
++ *
++ * Attempts to detect the language of a sample of text by correlating ranked
++ * 3-gram frequencies to a table of 3-gram frequencies of known languages.
++ *
++ * Implements a version of a technique originally proposed by Cavnar & Trenkle
++ * (1994): "N-Gram-Based Text Categorization"
++ *
++ * PHP version 5
++ *
++ * @category  Text
++ * @package   Text_LanguageDetect
++ * @author    Nicholas Pisarro <infinityminusnine+pear@gmail.com>
++ * @copyright 2005-2006 Nicholas Pisarro
++ * @license   http://www.debian.org/misc/bsd.license BSD
++ * @version   SVN: $Id: LanguageDetect.php 322353 2012-01-16 08:41:43Z cweiske $
++ * @link      http://pear.php.net/package/Text_LanguageDetect/
++ * @link      http://langdetect.blogspot.com/
++ */
++
++require_once 'Text/LanguageDetect/Exception.php';
++require_once 'Text/LanguageDetect/Parser.php';
++require_once 'Text/LanguageDetect/ISO639.php';
++
++/**
++ * Language detection class
++ *
++ * Requires the langauge model database (lang.dat) that should have
++ * accompanied this class definition in order to be instantiated.
++ *
++ * Example usage:
++ *
++ * <code>
++ * require_once 'Text/LanguageDetect.php';
++ *
++ * $l = new Text_LanguageDetect;
++ *
++ * $stdin = fopen('php://stdin', 'r');
++ *
++ * echo "Supported languages:\n";
++ *
++ * try {
++ *     $langs = $l->getLanguages();
++ * } catch (Text_LanguageDetect_Exception $e) {
++ *     die($e->getMessage());
++ * }
++ *
++ * sort($langs);
++ * echo join(', ', $langs);
++ *
++ * while ($line = fgets($stdin)) {
++ *     print_r($l->detect($line, 4));
++ * }
++ * </code>
++ *
++ * @category  Text
++ * @package   Text_LanguageDetect
++ * @author    Nicholas Pisarro <infinityminusnine+pear@gmail.com>
++ * @copyright 2005 Nicholas Pisarro
++ * @license   http://www.debian.org/misc/bsd.license BSD
++ * @version   Release: @package_version@
++ * @link      http://pear.php.net/package/Text_LanguageDetect/
++ * @todo      allow users to generate their own language models
++ */
++class Text_LanguageDetect
++{
++    /**
++     * The filename that stores the trigram data for the detector
++     *
++     * If this value starts with a slash (/) or a dot (.) the value of
++     * $this->_data_dir will be ignored
++     *
++     * @var      string
++     * @access   private
++     */
++    var $_db_filename = 'lang.dat';
++
++    /**
++     * The filename that stores the unicode block definitions
++     *
++     * If this value starts with a slash (/) or a dot (.) the value of
++     * $this->_data_dir will be ignored
++     *
++     * @var string
++     * @access private
++     */
++    var $_unicode_db_filename = 'unicode_blocks.dat';
++
++    /**
++     * The data directory
++     *
++     * Should be set by PEAR installer
++     *
++     * @var      string
++     * @access   private
++     */
++    var $_data_dir = '@data_dir@';
++
++    /**
++     * The trigram data for comparison
++     *
++     * Will be loaded on start from $this->_db_filename
++     *
++     * @var      array
++     * @access   private
++     */
++    var $_lang_db = array();
++
++    /**
++     * stores the map of the trigram data to unicode characters
++     *
++     * @access private
++     * @var array
++     */
++    var $_unicode_map;
++
++    /**
++     * The size of the trigram data arrays
++     *
++     * @var      int
++     * @access   private
++     */
++    var $_threshold = 300;
++
++    /**
++     * the maximum possible score.
++     *
++     * needed for score normalization. Different depending on the
++     * perl compatibility setting
++     *
++     * @access  private
++     * @var     int
++     * @see     setPerlCompatible()
++     */
++    var $_max_score = 0;
++
++    /**
++     * Whether or not to simulate perl's Language::Guess exactly
++     *
++     * @access  private
++     * @var     bool
++     * @see     setPerlCompatible()
++     */
++    var $_perl_compatible = false;
++
++    /**
++     * Whether to use the unicode block detection to speed up processing
++     *
++     * @access private
++     * @var bool
++     */
++    var $_use_unicode_narrowing = true;
++
++    /**
++     * stores the result of the clustering operation
++     *
++     * @access  private
++     * @var     array
++     * @see     clusterLanguages()
++     */
++    var $_clusters;
++
++    /**
++     * Which type of "language names" are accepted and returned:
++     *
++     * 0 - language name ("english")
++     * 2 - 2-letter ISO 639-1 code ("en")
++     * 3 - 3-letter ISO 639-2 code ("eng")
++     */
++    var $_name_mode = 0;
++
++    /**
++     * Constructor
++     *
++     * Will attempt to load the language database. If it fails, you will get
++     * an exception.
++     */
++    function __construct()
++    {
++        $data = $this->_readdb($this->_db_filename);
++        $this->_checkTrigram($data['trigram']);
++        $this->_lang_db = $data['trigram'];
++
++        if (isset($data['trigram-unicodemap'])) {
++            $this->_unicode_map = $data['trigram-unicodemap'];
++        }
++
++        // Not yet implemented:
++        if (isset($data['trigram-clusters'])) {
++            $this->_clusters = $data['trigram-clusters'];
++        }
++    }
++
++    /**
++     * Returns the path to the location of the database
++     *
++     * @param string $fname File name to load
++     *
++     * @return string expected path to the language model database
++     * @access private
++     */
++    function _get_data_loc($fname)
++    {
++        if ($fname{0} == '/' || $fname{0} == '.') {
++            // if filename starts with a slash, assume it's an absolute pathname
++            // and skip whatever is in $this->_data_dir
++            return $fname;
++
++        } elseif ($this->_data_dir != '@' . 'data_dir' . '@') {
++            // if the data dir was set by the PEAR installer, use that
++            return $this->_data_dir . '/Text_LanguageDetect/' . $fname;
++
++        } else {
++            // assume this was just unpacked somewhere
++            // try the local working directory if otherwise
++            return __DIR__ . '/../data/' . $fname;
++        }
++    }
++
++    /**
++     * Loads the language trigram database from filename
++     *
++     * Trigram datbase should be a serialize()'d array
++     *
++     * @param string $fname the filename where the data is stored
++     *
++     * @return array the language model data
++     * @throws Text_LanguageDetect_Exception
++     * @access private
++     */
++    function _readdb($fname)
++    {
++        // finds the correct data dir
++        $fname = $this->_get_data_loc($fname);
++
++        // input check
++        if (!file_exists($fname)) {
++            throw new Text_LanguageDetect_Exception(
++                'Language database does not exist: ' . $fname,
++                Text_LanguageDetect_Exception::DB_NOT_FOUND
++            );
++        } elseif (!is_readable($fname)) {
++            throw new Text_LanguageDetect_Exception(
++                'Language database is not readable: ' . $fname,
++                Text_LanguageDetect_Exception::DB_NOT_READABLE
++            );
++        }
++
++        return unserialize(file_get_contents($fname));
++    }
++
++
++    /**
++     * Checks if this object is ready to detect languages
++     *
++     * @param array $trigram Trigram data from database
++     *
++     * @return void
++     * @access private
++     */
++    function _checkTrigram($trigram)
++    {
++        if (!is_array($trigram)) {
++            if (ini_get('magic_quotes_runtime')) {
++                throw new Text_LanguageDetect_Exception(
++                    'Error loading database. Try turning magic_quotes_runtime off.',
++                    Text_LanguageDetect_Exception::MAGIC_QUOTES
++                );
++            }
++            throw new Text_LanguageDetect_Exception(
++                'Language database is not an array.',
++                Text_LanguageDetect_Exception::DB_NOT_ARRAY
++            );
++        } elseif (empty($trigram)) {
++            throw new Text_LanguageDetect_Exception(
++                'Language database has no elements.',
++                Text_LanguageDetect_Exception::DB_EMPTY
++            );
++        }
++    }
++
++    /**
++     * Omits languages
++     *
++     * Pass this function the name of or an array of names of
++     * languages that you don't want considered
++     *
++     * If you're only expecting a limited set of languages, this can greatly
++     * speed up processing
++     *
++     * @param mixed $omit_list    language name or array of names to omit
++     * @param bool  $include_only if true will include (rather than
++     *                            exclude) only those in the list
++     *
++     * @return int number of languages successfully deleted
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function omitLanguages($omit_list, $include_only = false)
++    {
++        $deleted = 0;
++
++        $omit_list = $this->_convertFromNameMode($omit_list);
++
++        if (!$include_only) {
++            // deleting the given languages
++            if (!is_array($omit_list)) {
++                $omit_list = strtolower($omit_list); // case desensitize
++                if (isset($this->_lang_db[$omit_list])) {
++                    unset($this->_lang_db[$omit_list]);
++                    $deleted++;
++                }
++            } else {
++                foreach ($omit_list as $omit_lang) {
++                    if (isset($this->_lang_db[$omit_lang])) {
++                        unset($this->_lang_db[$omit_lang]);
++                        $deleted++;
++                    }
++                }
++            }
++
++        } else {
++            // deleting all except the given languages
++            if (!is_array($omit_list)) {
++                $omit_list = array($omit_list);
++            }
++
++            // case desensitize
++            foreach ($omit_list as $key => $omit_lang) {
++                $omit_list[$key] = strtolower($omit_lang);
++            }
++
++            foreach (array_keys($this->_lang_db) as $lang) {
++                if (!in_array($lang, $omit_list)) {
++                    unset($this->_lang_db[$lang]);
++                    $deleted++;
++                }
++            }
++        }
++
++        // reset the cluster cache if the number of languages changes
++        // this will then have to be recalculated
++        if (isset($this->_clusters) && $deleted > 0) {
++            $this->_clusters = null;
++        }
++
++        return $deleted;
++    }
++
++
++    /**
++     * Returns the number of languages that this object can detect
++     *
++     * @access public
++     * @return int            the number of languages
++     * @throws   Text_LanguageDetect_Exception
++     */
++    function getLanguageCount()
++    {
++        return count($this->_lang_db);
++    }
++
++    /**
++     * Checks if the language with the given name exists in the database
++     *
++     * @param mixed $lang Language name or array of language names
++     *
++     * @return bool true if language model exists
++     */
++    public function languageExists($lang)
++    {
++        $lang = $this->_convertFromNameMode($lang);
++
++        if (is_string($lang)) {
++            return isset($this->_lang_db[strtolower($lang)]);
++
++        } elseif (is_array($lang)) {
++            foreach ($lang as $test_lang) {
++                if (!isset($this->_lang_db[strtolower($test_lang)])) {
++                    return false;
++                }
++            }
++            return true;
++
++        } else {
++            throw new Text_LanguageDetect_Exception(
++                'Unsupported parameter type passed to languageExists()',
++                Text_LanguageDetect_Exception::PARAM_TYPE
++            );
++        }
++    }
++
++    /**
++     * Returns the list of detectable languages
++     *
++     * @access public
++     * @return array        the names of the languages known to this object<<<<<<<
++     * @throws   Text_LanguageDetect_Exception
++     */
++    function getLanguages()
++    {
++        return $this->_convertToNameMode(
++            array_keys($this->_lang_db)
++        );
++    }
++
++    /**
++     * Make this object behave like Language::Guess
++     *
++     * @param bool $setting false to turn off perl compatibility
++     *
++     * @return void
++     */
++    public function setPerlCompatible($setting = true)
++    {
++        if (is_bool($setting)) { // input check
++            $this->_perl_compatible = $setting;
++
++            if ($setting == true) {
++                $this->_max_score = $this->_threshold;
++            } else {
++                $this->_max_score = 0;
++            }
++        }
++
++    }
++
++    /**
++     * Sets the way how language names are accepted and returned.
++     *
++     * @param integer $name_mode One of the following modes:
++     *                           0 - language name ("english")
++     *                           2 - 2-letter ISO 639-1 code ("en")
++     *                           3 - 3-letter ISO 639-2 code ("eng")
++     *
++     * @return void
++     */
++    function setNameMode($name_mode)
++    {
++        $this->_name_mode = $name_mode;
++    }
++
++    /**
++     * Whether to use unicode block ranges in detection
++     *
++     * Should speed up most detections if turned on (detault is on). In some
++     * circumstances it may be slower, such as for large text samples (> 10K)
++     * in languages that use latin scripts. In other cases it should speed up
++     * detection noticeably.
++     *
++     * @param bool $setting false to turn off
++     *
++     * @return void
++     */
++    public function useUnicodeBlocks($setting = true)
++    {
++        if (is_bool($setting)) {
++            $this->_use_unicode_narrowing = $setting;
++        }
++    }
++
++    /**
++     * Converts a piece of text into trigrams
++     *
++     * @param string $text text to convert
++     *
++     * @return     array array of trigram frequencies
++     * @access     private
++     * @deprecated Superceded by the Text_LanguageDetect_Parser class
++     */
++    function _trigram($text)
++    {
++        $s = new Text_LanguageDetect_Parser($text);
++        $s->prepareTrigram();
++        $s->prepareUnicode(false);
++        $s->setPadStart(!$this->_perl_compatible);
++        $s->analyze();
++        return $s->getTrigramFreqs();
++    }
++
++    /**
++     * Converts a set of trigrams from frequencies to ranks
++     *
++     * Thresholds (cuts off) the list at $this->_threshold
++     *
++     * @param array $arr array of trigram
++     *
++     * @return array ranks of trigrams
++     * @access protected
++     */
++    function _arr_rank($arr)
++    {
++
++        // sorts alphabetically first as a standard way of breaking rank ties
++        $this->_bub_sort($arr);
++
++        // below might also work, but seemed to introduce errors in testing
++        //ksort($arr);
++        //asort($arr);
++
++        $rank = array();
++
++        $i = 0;
++        foreach ($arr as $key => $value) {
++            $rank[$key] = $i++;
++
++            // cut off at a standard threshold
++            if ($i >= $this->_threshold) {
++                break;
++            }
++        }
++
++        return $rank;
++    }
++
++    /**
++     * Sorts an array by value breaking ties alphabetically
++     *
++     * @param array &$arr the array to sort
++     *
++     * @return void
++     * @access private
++     */
++    function _bub_sort(&$arr)
++    {
++        // should do the same as this perl statement:
++        // sort { $trigrams{$b} == $trigrams{$a}
++        //   ?  $a cmp $b : $trigrams{$b} <=> $trigrams{$a} }
++
++        // needs to sort by both key and value at once
++        // using the key to break ties for the value
++
++        // converts array into an array of arrays of each key and value
++        // may be a better way of doing this
++        $combined = array();
++
++        foreach ($arr as $key => $value) {
++            $combined[] = array($key, $value);
++        }
++
++        usort($combined, array($this, '_sort_func'));
++
++        $replacement = array();
++        foreach ($combined as $key => $value) {
++            list($new_key, $new_value) = $value;
++            $replacement[$new_key] = $new_value;
++        }
++
++        $arr = $replacement;
++    }
++
++    /**
++     * Sort function used by bubble sort
++     *
++     * Callback function for usort().
++     *
++     * @param array $a first param passed by usort()
++     * @param array $b second param passed by usort()
++     *
++     * @return int 1 if $a is greater, -1 if not
++     * @see    _bub_sort()
++     * @access private
++     */
++    function _sort_func($a, $b)
++    {
++        // each is actually a key/value pair, so that it can compare using both
++        list($a_key, $a_value) = $a;
++        list($b_key, $b_value) = $b;
++
++        if ($a_value == $b_value) {
++            // if the values are the same, break ties using the key
++            return strcmp($a_key, $b_key);
++
++        } else {
++            // if not, just sort normally
++            if ($a_value > $b_value) {
++                return -1;
++            } else {
++                return 1;
++            }
++        }
++
++        // 0 should not be possible because keys must be unique
++    }
++
++    /**
++     * Calculates a linear rank-order distance statistic between two sets of
++     * ranked trigrams
++     *
++     * Sums the differences in rank for each trigram. If the trigram does not
++     * appear in both, consider it a difference of $this->_threshold.
++     *
++     * This distance measure was proposed by Cavnar & Trenkle (1994). Despite
++     * its simplicity it has been shown to be highly accurate for language
++     * identification tasks.
++     *
++     * @param array $arr1 the reference set of trigram ranks
++     * @param array $arr2 the target set of trigram ranks
++     *
++     * @return int the sum of the differences between the ranks of
++     *             the two trigram sets
++     * @access private
++     */
++    function _distance($arr1, $arr2)
++    {
++        $sumdist = 0;
++
++        foreach ($arr2 as $key => $value) {
++            if (isset($arr1[$key])) {
++                $distance = abs($value - $arr1[$key]);
++            } else {
++                // $this->_threshold sets the maximum possible distance value
++                // for any one pair of trigrams
++                $distance = $this->_threshold;
++            }
++            $sumdist += $distance;
++        }
++
++        return $sumdist;
++
++        // todo: there are other distance statistics to try, e.g. relative
++        //       entropy, but they're probably more costly to compute
++    }
++
++    /**
++     * Normalizes the score returned by _distance()
++     *
++     * Different if perl compatible or not
++     *
++     * @param int $score      the score from _distance()
++     * @param int $base_count the number of trigrams being considered
++     *
++     * @return float the normalized score
++     * @see    _distance()
++     * @access private
++     */
++    function _normalize_score($score, $base_count = null)
++    {
++        if ($base_count === null) {
++            $base_count = $this->_threshold;
++        }
++
++        if (!$this->_perl_compatible) {
++            return 1 - ($score / $base_count / $this->_threshold);
++        } else {
++            return floor($score / $base_count);
++        }
++    }
++
++
++    /**
++     * Detects the closeness of a sample of text to the known languages
++     *
++     * Calculates the statistical difference between the text and
++     * the trigrams for each language, normalizes the score then
++     * returns results for all languages in sorted order
++     *
++     * If perl compatible, the score is 300-0, 0 being most similar.
++     * Otherwise, it's 0-1 with 1 being most similar.
++     *
++     * The $sample text should be at least a few sentences in length;
++     * should be ascii-7 or utf8 encoded, if another and the mbstring extension
++     * is present it will try to detect and convert. However, experience has
++     * shown that mb_detect_encoding() *does not work very well* with at least
++     * some types of encoding.
++     *
++     * @param string $sample a sample of text to compare.
++     * @param int    $limit  if specified, return an array of the most likely
++     *                       $limit languages and their scores.
++     *
++     * @return mixed sorted array of language scores, blank array if no
++     *               useable text was found
++     * @see    _distance()
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function detect($sample, $limit = 0)
++    {
++        // input check
++        if (!Text_LanguageDetect_Parser::validateString($sample)) {
++            return array();
++        }
++
++        // check char encoding
++        // (only if mbstring extension is compiled and PHP > 4.0.6)
++        if (function_exists('mb_detect_encoding')
++            && function_exists('mb_convert_encoding')
++        ) {
++            // mb_detect_encoding isn't very reliable, to say the least
++            // detection should still work with a sufficient sample
++            //  of ascii characters
++            $encoding = mb_detect_encoding($sample);
++
++            // mb_detect_encoding() will return FALSE if detection fails
++            // don't attempt conversion if that's the case
++            if ($encoding != 'ASCII' && $encoding != 'UTF-8'
++                && $encoding !== false
++            ) {
++                // verify the encoding exists in mb_list_encodings
++                if (in_array($encoding, mb_list_encodings())) {
++                    $sample = mb_convert_encoding($sample, 'UTF-8', $encoding);
++                }
++            }
++        }
++
++        $sample_obj = new Text_LanguageDetect_Parser($sample);
++        $sample_obj->prepareTrigram();
++        if ($this->_use_unicode_narrowing) {
++            $sample_obj->prepareUnicode();
++        }
++        $sample_obj->setPadStart(!$this->_perl_compatible);
++        $sample_obj->analyze();
++
++        $trigram_freqs =& $sample_obj->getTrigramRanks();
++        $trigram_count = count($trigram_freqs);
++
++        if ($trigram_count == 0) {
++            return array();
++        }
++
++        $scores = array();
++
++        // use unicode block detection to narrow down the possibilities
++        if ($this->_use_unicode_narrowing) {
++            $blocks =& $sample_obj->getUnicodeBlocks();
++
++            if (is_array($blocks)) {
++                $present_blocks = array_keys($blocks);
++            } else {
++                throw new Text_LanguageDetect_Exception(
++                    'Error during block detection',
++                    Text_LanguageDetect_Exception::BLOCK_DETECTION
++                );
++            }
++
++            $possible_langs = array();
++
++            foreach ($present_blocks as $blockname) {
++                if (isset($this->_unicode_map[$blockname])) {
++
++                    $possible_langs = array_merge(
++                        $possible_langs,
++                        array_keys($this->_unicode_map[$blockname])
++                    );
++
++                    // todo: faster way to do this?
++                }
++            }
++
++            // could also try an intersect operation rather than a union
++            // in other words, choose languages whose trigrams contain
++            // ALL of the unicode blocks found in this sample
++            // would improve speed but would be completely thrown off by an
++            // unexpected character, like an umlaut appearing in english text
++
++            $possible_langs = array_intersect(
++                array_keys($this->_lang_db),
++                array_unique($possible_langs)
++            );
++
++            // needs to intersect it with the keys of _lang_db in case
++            // languages have been omitted
++
++        } else {
++            // or just try 'em all
++            $possible_langs = array_keys($this->_lang_db);
++        }
++
++
++        foreach ($possible_langs as $lang) {
++            $scores[$lang] = $this->_normalize_score(
++                $this->_distance($this->_lang_db[$lang], $trigram_freqs),
++                $trigram_count
++            );
++        }
++
++        unset($sample_obj);
++
++        if ($this->_perl_compatible) {
++            asort($scores);
++        } else {
++            arsort($scores);
++        }
++
++        // todo: drop languages with a score of $this->_max_score?
++
++        // limit the number of returned scores
++        if ($limit && is_numeric($limit)) {
++            $limited_scores = array();
++
++            $i = 0;
++            foreach ($scores as $key => $value) {
++                if ($i++ >= $limit) {
++                    break;
++                }
++
++                $limited_scores[$key] = $value;
++            }
++
++            return $this->_convertToNameMode($limited_scores, true);
++        } else {
++            return $this->_convertToNameMode($scores, true);
++        }
++    }
++
++    /**
++     * Returns only the most similar language to the text sample
++     *
++     * Calls $this->detect() and returns only the top result
++     *
++     * @param string $sample text to detect the language of
++     *
++     * @return string the name of the most likely language
++     *                or null if no language is similar
++     * @see    detect()
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function detectSimple($sample)
++    {
++        $scores = $this->detect($sample, 1);
++
++        // if top language has the maximum possible score,
++        // then the top score will have been picked at random
++        if (!is_array($scores) || empty($scores)
++            || current($scores) == $this->_max_score
++        ) {
++            return null;
++        } else {
++            return key($scores);
++        }
++    }
++
++    /**
++     * Returns an array containing the most similar language and a confidence
++     * rating
++     *
++     * Confidence is a simple measure calculated from the similarity score
++     * minus the similarity score from the next most similar language
++     * divided by the highest possible score. Languages that have closely
++     * related cousins (e.g. Norwegian and Danish) should generally have lower
++     * confidence scores.
++     *
++     * The similarity score answers the question "How likely is the text the
++     * returned language regardless of the other languages considered?" The
++     * confidence score is one way of answering the question "how likely is the
++     * text the detected language relative to the rest of the language model
++     * set?"
++     *
++     * To see how similar languages are a priori, see languageSimilarity()
++     *
++     * @param string $sample text for which language will be detected
++     *
++     * @return array most similar language, score and confidence rating
++     *               or null if no language is similar
++     * @see    detect()
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function detectConfidence($sample)
++    {
++        $scores = $this->detect($sample, 2);
++
++        // if most similar language has the max score, it
++        // will have been picked at random
++        if (!is_array($scores) || empty($scores)
++            || current($scores) == $this->_max_score
++        ) {
++            return null;
++        }
++
++        $arr['language'] = key($scores);
++        $arr['similarity'] = current($scores);
++        if (next($scores) !== false) { // if false then no next element
++            // the goal is to return a higher value if the distance between
++            // the similarity of the first score and the second score is high
++
++            if ($this->_perl_compatible) {
++                $arr['confidence'] = (current($scores) - $arr['similarity'])
++                    / $this->_max_score;
++
++            } else {
++                $arr['confidence'] = $arr['similarity'] - current($scores);
++
++            }
++
++        } else {
++            $arr['confidence'] = null;
++        }
++
++        return $arr;
++    }
++
++    /**
++     * Returns the distribution of unicode blocks in a given utf8 string
++     *
++     * For the block name of a single char, use unicodeBlockName()
++     *
++     * @param string $str          input string. Must be ascii or utf8
++     * @param bool   $skip_symbols if true, skip ascii digits, symbols and
++     *                             non-printing characters. Includes spaces,
++     *                             newlines and common punctutation characters.
++     *
++     * @return array
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function detectUnicodeBlocks($str, $skip_symbols)
++    {
++        $skip_symbols = (bool)$skip_symbols;
++        $str          = (string)$str;
++
++        $sample_obj = new Text_LanguageDetect_Parser($str);
++        $sample_obj->prepareUnicode();
++        $sample_obj->prepareTrigram(false);
++        $sample_obj->setUnicodeSkipSymbols($skip_symbols);
++        $sample_obj->analyze();
++        $blocks = $sample_obj->getUnicodeBlocks();
++        unset($sample_obj);
++        return $blocks;
++    }
++
++    /**
++     * Returns the block name for a given unicode value
++     *
++     * If passed a string, will assume it is being passed a UTF8-formatted
++     * character and will automatically convert. Otherwise it will assume it
++     * is being passed a numeric unicode value.
++     *
++     * Make sure input is of the correct type!
++     *
++     * @param mixed $unicode unicode value or utf8 char
++     *
++     * @return mixed the block name string or false if not found
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function unicodeBlockName($unicode)
++    {
++        if (is_string($unicode)) {
++            // assume it is being passed a utf8 char, so convert it
++            if (self::utf8strlen($unicode) > 1) {
++                throw new Text_LanguageDetect_Exception(
++                    'Pass a single char only to this method',
++                    Text_LanguageDetect_Exception::PARAM_TYPE
++                );
++            }
++            $unicode = $this->_utf8char2unicode($unicode);
++
++        } elseif (!is_int($unicode)) {
++            throw new Text_LanguageDetect_Exception(
++                'Input must be of type string or int.',
++                Text_LanguageDetect_Exception::PARAM_TYPE
++            );
++        }
++
++        $blocks = $this->_read_unicode_block_db();
++
++        $result = $this->_unicode_block_name($unicode, $blocks);
++
++        if ($result == -1) {
++            return false;
++        } else {
++            return $result[2];
++        }
++    }
++
++    /**
++     * Searches the unicode block database
++     *
++     * Returns the block name for a given unicode value. unicodeBlockName() is
++     * the public interface for this function, which does input checks which
++     * this function omits for speed.
++     *
++     * @param int   $unicode     the unicode value
++     * @param array $blocks      the block database
++     * @param int   $block_count the number of defined blocks in the database
++     *
++     * @return mixed Block name, -1 if it failed
++     * @see    unicodeBlockName()
++     * @access protected
++     */
++    function _unicode_block_name($unicode, $blocks, $block_count = -1)
++    {
++        // for a reference, see
++        // http://www.unicode.org/Public/UNIDATA/Blocks.txt
++
++        // assume that ascii characters are the most common
++        // so try it first for efficiency
++        if ($unicode <= $blocks[0][1]) {
++            return $blocks[0];
++        }
++
++        // the optional $block_count param is for efficiency
++        // so we this function doesn't have to run count() every time
++        if ($block_count != -1) {
++            $high = $block_count - 1;
++        } else {
++            $high = count($blocks) - 1;
++        }
++
++        $low = 1; // start with 1 because ascii was 0
++
++        // your average binary search algorithm
++        while ($low <= $high) {
++            $mid = floor(($low + $high) / 2);
++
++            if ($unicode < $blocks[$mid][0]) {
++                // if it's lower than the lower bound
++                $high = $mid - 1;
++
++            } elseif ($unicode > $blocks[$mid][1]) {
++                // if it's higher than the upper bound
++                $low = $mid + 1;
++
++            } else {
++                // found it
++                return $blocks[$mid];
++            }
++        }
++
++        // failed to find the block
++        return -1;
++
++        // todo: differentiate when it's out of range or when it falls
++        //       into an unassigned range?
++    }
++
++    /**
++     * Brings up the unicode block database
++     *
++     * @return array the database of unicode block definitions
++     * @throws Text_LanguageDetect_Exception
++     * @access protected
++     */
++    function _read_unicode_block_db()
++    {
++        // since the unicode definitions are always going to be the same,
++        // might as well share the memory for the db with all other instances
++        // of this class
++        static $data;
++
++        if (!isset($data)) {
++            $data = $this->_readdb($this->_unicode_db_filename);
++        }
++
++        return $data;
++    }
++
++    /**
++     * Calculate the similarities between the language models
++     *
++     * Use this function to see how similar languages are to each other.
++     *
++     * If passed 2 language names, will return just those languages compared.
++     * If passed 1 language name, will return that language compared to
++     * all others.
++     * If passed none, will return an array of every language model compared
++     * to every other one.
++     *
++     * @param string $lang1 the name of the first language to be compared
++     * @param string $lang2 the name of the second language to be compared
++     *
++     * @return array scores of every language compared
++     *               or the score of just the provided languages
++     *               or null if one of the supplied languages does not exist
++     * @throws Text_LanguageDetect_Exception
++     */
++    public function languageSimilarity($lang1 = null, $lang2 = null)
++    {
++        $lang1 = $this->_convertFromNameMode($lang1);
++        $lang2 = $this->_convertFromNameMode($lang2);
++        if ($lang1 != null) {
++            $lang1 = strtolower($lang1);
++
++            // check if language model exists
++            if (!isset($this->_lang_db[$lang1])) {
++                return null;
++            }
++
++            if ($lang2 != null) {
++                if (!isset($this->_lang_db[$lang2])) {
++                    // check if language model exists
++                    return null;
++                }
++
++                $lang2 = strtolower($lang2);
++
++                // compare just these two languages
++                return $this->_normalize_score(
++                    $this->_distance(
++                        $this->_lang_db[$lang1],
++                        $this->_lang_db[$lang2]
++                    )
++                );
++
++            } else {
++                // compare just $lang1 to all languages
++                $return_arr = array();
++                foreach ($this->_lang_db as $key => $value) {
++                    if ($key != $lang1) {
++                        // don't compare a language to itself
++                        $return_arr[$key] = $this->_normalize_score(
++                            $this->_distance($this->_lang_db[$lang1], $value)
++                        );
++                    }
++                }
++                asort($return_arr);
++
++                return $return_arr;
++            }
++
++
++        } else {
++            // compare all languages to each other
++            $return_arr = array();
++            foreach (array_keys($this->_lang_db) as $lang1) {
++                foreach (array_keys($this->_lang_db) as $lang2) {
++                    // skip comparing languages to themselves
++                    if ($lang1 != $lang2) {
++
++                        if (isset($return_arr[$lang2][$lang1])) {
++                            // don't re-calculate what's already been done
++                            $return_arr[$lang1][$lang2]
++                                = $return_arr[$lang2][$lang1];
++
++                        } else {
++                            // calculate
++                            $return_arr[$lang1][$lang2]
++                                = $this->_normalize_score(
++                                    $this->_distance(
++                                        $this->_lang_db[$lang1],
++                                        $this->_lang_db[$lang2]
++                                    )
++                                );
++
++                        }
++                    }
++                }
++            }
++            return $return_arr;
++        }
++    }
++
++    /**
++     * Cluster known languages according to languageSimilarity()
++     *
++     * WARNING: this method is EXPERIMENTAL. It is not recommended for common
++     * use, and it may disappear or its functionality may change in future
++     * releases without notice.
++     *
++     * Uses a nearest neighbor technique to generate the maximum possible
++     * number of dendograms from the similarity data.
++     *
++     * @access      public
++     * @return      array language cluster data
++     * @throws      Text_LanguageDetect_Exception
++     * @see         languageSimilarity()
++     * @deprecated  this function will eventually be removed and placed into
++     *              the model generation class
++     */
++    function clusterLanguages()
++    {
++        // todo: set the maximum number of clusters
++        // return cached result, if any
++        if (isset($this->_clusters)) {
++            return $this->_clusters;
++        }
++
++        $langs = array_keys($this->_lang_db);
++
++        $arr = $this->languageSimilarity();
++
++        sort($langs);
++
++        foreach ($langs as $lang) {
++            if (!isset($this->_lang_db[$lang])) {
++                throw new Text_LanguageDetect_Exception(
++                    "missing $lang!",
++                    Text_LanguageDetect_Exception::UNKNOWN_LANGUAGE
++                );
++            }
++        }
++
++        // http://www.psychstat.missouristate.edu/multibook/mlt04m.html
++        foreach ($langs as $old_key => $lang1) {
++            $langs[$lang1] = $lang1;
++            unset($langs[$old_key]);
++        }
++
++        $result_data = $really_map = array();
++
++        $i = 0;
++        while (count($langs) > 2 && $i++ < 200) {
++            $highest_score = -1;
++            $highest_key1 = '';
++            $highest_key2 = '';
++            foreach ($langs as $lang1) {
++                foreach ($langs as $lang2) {
++                    if ($lang1 != $lang2
++                        && $arr[$lang1][$lang2] > $highest_score
++                    ) {
++                        $highest_score = $arr[$lang1][$lang2];
++                        $highest_key1 = $lang1;
++                        $highest_key2 = $lang2;
++                    }
++                }
++            }
++
++            if (!$highest_key1) {
++                // should not ever happen
++                throw new Text_LanguageDetect_Exception(
++                    "no highest key? (step: $i)",
++                    Text_LanguageDetect_Exception::NO_HIGHEST_KEY
++                );
++            }
++
++            if ($highest_score == 0) {
++                // languages are perfectly dissimilar
++                break;
++            }
++
++            // $highest_key1 and $highest_key2 are most similar
++            $sum1 = array_sum($arr[$highest_key1]);
++            $sum2 = array_sum($arr[$highest_key2]);
++
++            // use the score for the one that is most similar to the rest of
++            // the field as the score for the group
++            // todo: could try averaging or "centroid" method instead
++            // seems like that might make more sense
++            // actually nearest neighbor may be better for binary searching
++
++
++            // for "Complete Linkage"/"furthest neighbor"
++            // sign should be <
++            // for "Single Linkage"/"nearest neighbor" method
++            // should should be >
++            // results seem to be pretty much the same with either method
++
++            // figure out which to delete and which to replace
++            if ($sum1 > $sum2) {
++                $replaceme = $highest_key1;
++                $deleteme = $highest_key2;
++            } else {
++                $replaceme = $highest_key2;
++                $deleteme = $highest_key1;
++            }
++
++            $newkey = $replaceme . ':' . $deleteme;
++
++            // $replaceme is most similar to remaining languages
++            // replace $replaceme with '$newkey', deleting $deleteme
++
++            // keep a record of which fork is really which language
++            $really_lang = $replaceme;
++            while (isset($really_map[$really_lang])) {
++                $really_lang = $really_map[$really_lang];
++            }
++            $really_map[$newkey] = $really_lang;
++
++
++            // replace the best fitting key, delete the other
++            foreach ($arr as $key1 => $arr2) {
++                foreach ($arr2 as $key2 => $value2) {
++                    if ($key2 == $replaceme) {
++                        $arr[$key1][$newkey] = $arr[$key1][$key2];
++                        unset($arr[$key1][$key2]);
++                        // replacing $arr[$key1][$key2] with $arr[$key1][$newkey]
++                    }
++
++                    if ($key1 == $replaceme) {
++                        $arr[$newkey][$key2] = $arr[$key1][$key2];
++                        unset($arr[$key1][$key2]);
++                        // replacing $arr[$key1][$key2] with $arr[$newkey][$key2]
++                    }
++
++                    if ($key1 == $deleteme || $key2 == $deleteme) {
++                        // deleting $arr[$key1][$key2]
++                        unset($arr[$key1][$key2]);
++                    }
++                }
++            }
++
++
++            unset($langs[$highest_key1]);
++            unset($langs[$highest_key2]);
++            $langs[$newkey] = $newkey;
++
++
++            // some of these may be overkill
++            $result_data[$newkey] = array(
++                                'newkey' => $newkey,
++                                'count' => $i,
++                                'diff' => abs($sum1 - $sum2),
++                                'score' => $highest_score,
++                                'bestfit' => $replaceme,
++                                'otherfit' => $deleteme,
++                                'really' => $really_lang,
++                            );
++        }
++
++        $return_val = array(
++                'open_forks' => $langs,
++                        // the top level of clusters
++                        // clusters that are mutually exclusive
++                        // or specified by a specific maximum
++
++                'fork_data' => $result_data,
++                        // data for each split
++
++                'name_map' => $really_map,
++                        // which cluster is really which language
++                        // using the nearest neighbor technique, the cluster
++                        // inherits all of the properties of its most-similar member
++                        // this keeps track
++            );
++
++
++        // saves the result in the object
++        $this->_clusters = $return_val;
++
++        return $return_val;
++    }
++
++
++    /**
++     * Perform an intelligent detection based on clusterLanguages()
++     *
++     * WARNING: this method is EXPERIMENTAL. It is not recommended for common
++     * use, and it may disappear or its functionality may change in future
++     * releases without notice.
++     *
++     * This compares the sample text to top the top level of clusters. If the
++     * sample is similar to the cluster it will drop down and compare it to the
++     * languages in the cluster, and so on until it hits a leaf node.
++     *
++     * this should find the language in considerably fewer compares
++     * (the equivalent of a binary search), however clusterLanguages() is costly
++     * and the loss of accuracy from this technique is significant.
++     *
++     * This method may need to be 'fuzzier' in order to become more accurate.
++     *
++     * This function could be more useful if the universe of possible languages
++     * was very large, however in such cases some method of Bayesian inference
++     * might be more helpful.
++     *
++     * @param string $str input string
++     *
++     * @return array language scores (only those compared)
++     * @throws Text_LanguageDetect_Exception
++     * @see    clusterLanguages()
++     */
++    public function clusteredSearch($str)
++    {
++        // input check
++        if (!Text_LanguageDetect_Parser::validateString($str)) {
++            return array();
++        }
++
++        // clusterLanguages() will return a cached result if possible
++        // so it's safe to call it every time
++        $result = $this->clusterLanguages();
++
++        $dendogram_start = $result['open_forks'];
++        $dendogram_data  = $result['fork_data'];
++        $dendogram_alias = $result['name_map'];
++
++        $sample_obj = new Text_LanguageDetect_Parser($str);
++        $sample_obj->prepareTrigram();
++        $sample_obj->setPadStart(!$this->_perl_compatible);
++        $sample_obj->analyze();
++        $sample_result = $sample_obj->getTrigramRanks();
++        $sample_count  = count($sample_result);
++
++        // input check
++        if ($sample_count == 0) {
++            return array();
++        }
++
++        $i = 0; // counts the number of steps
++
++        foreach ($dendogram_start as $lang) {
++            if (isset($dendogram_alias[$lang])) {
++                $lang_key = $dendogram_alias[$lang];
++            } else {
++                $lang_key = $lang;
++            }
++
++            $scores[$lang] = $this->_normalize_score(
++                $this->_distance($this->_lang_db[$lang_key], $sample_result),
++                $sample_count
++            );
++
++            $i++;
++        }
++
++        if ($this->_perl_compatible) {
++            asort($scores);
++        } else {
++            arsort($scores);
++        }
++
++        $top_score = current($scores);
++        $top_key = key($scores);
++
++        // of starting forks, $top_key is the most similar to the sample
++
++        $cur_key = $top_key;
++        while (isset($dendogram_data[$cur_key])) {
++            $lang1 = $dendogram_data[$cur_key]['bestfit'];
++            $lang2 = $dendogram_data[$cur_key]['otherfit'];
++            foreach (array($lang1, $lang2) as $lang) {
++                if (isset($dendogram_alias[$lang])) {
++                    $lang_key = $dendogram_alias[$lang];
++                } else {
++                    $lang_key = $lang;
++                }
++
++                $scores[$lang] = $this->_normalize_score(
++                    $this->_distance($this->_lang_db[$lang_key], $sample_result),
++                    $sample_count
++                );
++
++                //todo: does not need to do same comparison again
++            }
++
++            $i++;
++
++            if ($scores[$lang1] > $scores[$lang2]) {
++                $cur_key = $lang1;
++                $loser_key = $lang2;
++            } else {
++                $cur_key = $lang2;
++                $loser_key = $lang1;
++            }
++
++            $diff = $scores[$cur_key] - $scores[$loser_key];
++
++            // $cur_key ({$dendogram_alias[$cur_key]}) wins
++            // over $loser_key ({$dendogram_alias[$loser_key]})
++            // with a difference of $diff
++        }
++
++        // found result in $i compares
++
++        // rather than sorting the result, preserve it so that you can see
++        // which paths the algorithm decided to take along the tree
++
++        // but sometimes the last item is only the second highest
++        if (($this->_perl_compatible  && (end($scores) > prev($scores)))
++            || (!$this->_perl_compatible && (end($scores) < prev($scores)))
++        ) {
++            $real_last_score = current($scores);
++            $real_last_key = key($scores);
++
++            // swaps the 2nd-to-last item for the last item
++            unset($scores[$real_last_key]);
++            $scores[$real_last_key] = $real_last_score;
++        }
++
++
++        if (!$this->_perl_compatible) {
++            $scores = array_reverse($scores, true);
++            // second param requires php > 4.0.3
++        }
++
++        return $scores;
++    }
++
++    /**
++     * ut8-safe strlen()
++     *
++     * Returns the numbers of characters (not bytes) in a utf8 string
++     *
++     * @param string $str string to get the length of
++     *
++     * @return int number of chars
++     */
++    public static function utf8strlen($str)
++    {
++        // utf8_decode() will convert unknown chars to '?', which is actually
++        // ideal for counting.
++
++        return strlen(utf8_decode($str));
++
++        // idea stolen from dokuwiki
++    }
++
++    /**
++     * Returns the unicode value of a utf8 char
++     *
++     * @param string $char a utf8 (possibly multi-byte) char
++     *
++     * @return int unicode value
++     * @access protected
++     * @link   http://en.wikipedia.org/wiki/UTF-8
++     */
++    function _utf8char2unicode($char)
++    {
++        // strlen() here will actually get the binary length of a single char
++        switch (strlen($char)) {
++        case 1:
++            // normal ASCII-7 byte
++            // 0xxxxxxx -->  0xxxxxxx
++            return ord($char{0});
++
++        case 2:
++            // 2 byte unicode
++            // 110zzzzx 10xxxxxx --> 00000zzz zxxxxxxx
++            $z = (ord($char{0}) & 0x000001F) << 6;
++            $x = (ord($char{1}) & 0x0000003F);
++            return ($z | $x);
++
++        case 3:
++            // 3 byte unicode
++            // 1110zzzz 10zxxxxx 10xxxxxx --> zzzzzxxx xxxxxxxx
++            $z =  (ord($char{0}) & 0x0000000F) << 12;
++            $x1 = (ord($char{1}) & 0x0000003F) << 6;
++            $x2 = (ord($char{2}) & 0x0000003F);
++            return ($z | $x1 | $x2);
++
++        case 4:
++            // 4 byte unicode
++            // 11110zzz 10zzxxxx 10xxxxxx 10xxxxxx -->
++            // 000zzzzz xxxxxxxx xxxxxxxx
++            $z1 = (ord($char{0}) & 0x00000007) << 18;
++            $z2 = (ord($char{1}) & 0x0000003F) << 12;
++            $x1 = (ord($char{2}) & 0x0000003F) << 6;
++            $x2 = (ord($char{3}) & 0x0000003F);
++            return ($z1 | $z2 | $x1 | $x2);
++        }
++    }
++
++    /**
++     * utf8-safe fast character iterator
++     *
++     * Will get the next character starting from $counter, which will then be
++     * incremented. If a multi-byte char the bytes will be concatenated and
++     * $counter will be incremeted by the number of bytes in the char.
++     *
++     * @param string $str             the string being iterated over
++     * @param int    &$counter        the iterator, will increment by reference
++     * @param bool   $special_convert whether to do special conversions
++     *
++     * @return char the next (possibly multi-byte) char from $counter
++     * @access private
++     */
++    static function _next_char($str, &$counter, $special_convert = false)
++    {
++        $char = $str{$counter++};
++        $ord = ord($char);
++
++        // for a description of the utf8 system see
++        // http://www.phpclasses.org/browse/file/5131.html
++
++        // normal ascii one byte char
++        if ($ord <= 127) {
++            // special conversions needed for this package
++            // (that only apply to regular ascii characters)
++            // lower case, and convert all non-alphanumeric characters
++            // other than "'" to space
++            if ($special_convert && $char != ' ' && $char != "'") {
++                if ($ord >= 65 && $ord <= 90) { // A-Z
++                    $char = chr($ord + 32); // lower case
++                } elseif ($ord < 97 || $ord > 122) { // NOT a-z
++                    $char = ' '; // convert to space
++                }
++            }
++
++            return $char;
++
++        } elseif ($ord >> 5 == 6) { // two-byte char
++            // multi-byte chars
++            $nextchar = $str{$counter++}; // get next byte
++
++            // lower-casing of non-ascii characters is still incomplete
++
++            if ($special_convert) {
++                // lower case latin accented characters
++                if ($ord == 195) {
++                    $nextord = ord($nextchar);
++                    $nextord_adj = $nextord + 64;
++                    // for a reference, see
++                    // http://www.ramsch.org/martin/uni/fmi-hp/iso8859-1.html
++
++                    // &Agrave; - &THORN; but not &times;
++                    if ($nextord_adj >= 192
++                        && $nextord_adj <= 222
++                        && $nextord_adj != 215
++                    ) {
++                        $nextchar = chr($nextord + 32);
++                    }
++
++                } elseif ($ord == 208) {
++                    // lower case cyrillic alphabet
++                    $nextord = ord($nextchar);
++                    // if A - Pe
++                    if ($nextord >= 144 && $nextord <= 159) {
++                        // lower case
++                        $nextchar = chr($nextord + 32);
++
++                    } elseif ($nextord >= 160 && $nextord <= 175) {
++                        // if Er - Ya
++                        // lower case
++                        $char = chr(209); // == $ord++
++                        $nextchar = chr($nextord - 32);
++                    }
++                }
++            }
++
++            // tag on next byte
++            return $char . $nextchar;
++        } elseif ($ord >> 4  == 14) { // three-byte char
++
++            // tag on next 2 bytes
++            return $char . $str{$counter++} . $str{$counter++};
++
++        } elseif ($ord >> 3 == 30) { // four-byte char
++
++            // tag on next 3 bytes
++            return $char . $str{$counter++} . $str{$counter++} . $str{$counter++};
++
++        } else {
++            // error?
++        }
++    }
++
++    /**
++     * Converts an $language input parameter from the configured mode
++     * to the language name that is used internally.
++     *
++     * Works for strings and arrays.
++     *
++     * @param string|array $lang       A language description ("english"/"en"/"eng")
++     * @param boolean      $convertKey If $lang is an array, setting $key
++     *                                 converts the keys to the language name.
++     *
++     * @return string|array Language name
++     */
++    function _convertFromNameMode($lang, $convertKey = false)
++    {
++        if ($this->_name_mode == 0) {
++            return $lang;
++        }
++
++        if ($this->_name_mode == 2) {
++            $method = 'code2ToName';
++        } else {
++            $method = 'code3ToName';
++        }
++
++        if (is_string($lang)) {
++            return (string)Text_LanguageDetect_ISO639::$method($lang);
++        }
++
++        $newlang = array();
++        foreach ($lang as $key => $val) {
++            if ($convertKey) {
++                $newkey = (string)Text_LanguageDetect_ISO639::$method($key);
++                $newlang[$newkey] = $val;
++            } else {
++                $newlang[$key] = (string)Text_LanguageDetect_ISO639::$method($val);
++            }
++        }
++        return $newlang;
++    }
++
++    /**
++     * Converts an $language output parameter from the language name that is
++     * used internally to the configured mode.
++     *
++     * Works for strings and arrays.
++     *
++     * @param string|array $lang       A language description ("english"/"en"/"eng")
++     * @param boolean      $convertKey If $lang is an array, setting $key
++     *                                 converts the keys to the language name.
++     *
++     * @return string|array Language name
++     */
++    function _convertToNameMode($lang, $convertKey = false)
++    {
++        if ($this->_name_mode == 0) {
++            return $lang;
++        }
++
++        if ($this->_name_mode == 2) {
++            $method = 'nameToCode2';
++        } else {
++            $method = 'nameToCode3';
++        }
++
++        if (is_string($lang)) {
++            return Text_LanguageDetect_ISO639::$method($lang);
++        }
++
++        $newlang = array();
++        foreach ($lang as $key => $val) {
++            if ($convertKey) {
++                $newkey = Text_LanguageDetect_ISO639::$method($key);
++                $newlang[$newkey] = $val;
++            } else {
++                $newlang[$key] = Text_LanguageDetect_ISO639::$method($val);
++            }
++        }
++        return $newlang;
++    }
++}
++
++/* vim: set expandtab tabstop=4 shiftwidth=4 softtabstop=4: */
++
++?>
+diff --git a/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php b/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php
+index bbf4dd7..01dfe26 100644
+--- a/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php
++++ b/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php
+@@ -1444,7 +1444,8 @@ class Text_LanguageDetectTest extends PHPUnit_Framework_TestCase {
+         $this->assertInternalType('array', $scores);
+         $this->assertGreaterThan(5, count($scores));
+ 
+-        list($key, $value) = each($scores);
++        reset($scores);
++        $key = key($scores);
+         $this->assertEquals('german', $key, 'text is german');
+     }
+ 
+@@ -1452,7 +1453,9 @@ class Text_LanguageDetectTest extends PHPUnit_Framework_TestCase {
+     {
+         $this->x->setNameMode(2);
+         $scores = $this->x->detect('Das ist ein kleiner Text für euch alle');
+-        list($key, $value) = each($scores);
++
++        reset($scores);
++        $key = key($scores);
+         $this->assertEquals('de', $key, 'text is german');
+     }
+ 
+@@ -1460,7 +1463,9 @@ class Text_LanguageDetectTest extends PHPUnit_Framework_TestCase {
+     {
+         $this->x->setNameMode(2);
+         $scores = $this->x->detect('Das ist ein kleiner Text für euch alle', 1);
+-        list($key, $value) = each($scores);
++
++        reset($scores);
++        $key = key($scores);
+         $this->assertEquals('de', $key, 'text is german');
+     }
+ 
+diff --git a/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php.orig b/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php.orig
+new file mode 100644
+index 0000000..bbf4dd7
+--- /dev/null
++++ b/Text_LanguageDetect-0.3.0/tests/Text_LanguageDetectTest.php.orig
+@@ -0,0 +1,2056 @@
++<?php
++
++/**
++ * @package Text_LanguageDetect
++ * @version CVS: $Id: Text_LanguageDetectTest.php 322353 2012-01-16 08:41:43Z cweiske $
++ */
++set_include_path(
++    __DIR__ . '/../' . PATH_SEPARATOR . get_include_path()
++);
++error_reporting(E_ALL|E_STRICT);
++
++require_once 'Text/LanguageDetect.php';
++require_once 'PHPUnit/Framework/TestCase.php';
++
++class Text_LanguageDetectTest extends PHPUnit_Framework_TestCase {
++
++    function setup ()
++    {
++        ini_set('magic_quotes_runtime', 0);
++        $this->x = new Text_LanguageDetect();
++    }
++
++    function tearDown ()
++    {
++        unset($this->x);
++    }
++
++    function test_get_data_locAbsolute()
++    {
++        $this->assertEquals(
++            '/path/to/file',
++            $this->x->_get_data_loc('/path/to/file')
++        );
++    }
++
++    function test_get_data_locPearPath()
++    {
++        $this->x->_data_dir = '/path/to/pear/data';
++        $this->assertEquals(
++            '/path/to/pear/data/Text_LanguageDetect/file',
++            $this->x->_get_data_loc('file')
++        );
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Language database does not exist:
++     */
++    function test_readdbNonexistingFile()
++    {
++        $this->x->_readdb('thisfiledoesnotexist');
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Language database is not readable:
++     */
++    function test_readdbUnreadableFile()
++    {
++        $name = tempnam(sys_get_temp_dir(), 'unittest-Text_LanguageDetect-');
++        chmod($name, 0000);
++        $this->x->_readdb($name);
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Language database has no elements.
++     */
++    function test_checkTrigramEmpty()
++    {
++        $this->x->_checkTrigram(array());
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Language database is not an array
++     */
++    function test_checkTrigramNoArray()
++    {
++        $this->x->_checkTrigram('foo');
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Error loading database. Try turning magic_quotes_runtime off
++     */
++    function test_checkTrigramNoArrayMagicQuotes()
++    {
++        if (version_compare(PHP_VERSION, '5.4.0-dev') >= 0) {
++            $this->markTestSkipped('5.4.0 has no magic quotes anymore');
++        }
++        ini_set('magic_quotes_runtime', 1);
++        $this->x->_checkTrigram('foo');
++    }
++
++    function test_splitter ()
++    {
++        $str = 'hello';
++
++        $result = $this->x->_trigram($str);
++
++        $this->assertEquals(array(' he' => 1, 'hel' => 1, 'ell' => 1, 'llo' => 1, 'lo ' => 1), $result);
++
++        $str = 'aa aa whatever';
++
++        $result = $this->x->_trigram($str);
++        $this->assertEquals(2, $result[' aa']);
++        $this->assertEquals(2, $result['aa ']);
++        $this->assertEquals(1, $result['a a']);
++
++        $str = 'aa  aa';
++        $result = $this->x->_trigram($str);
++        $this->assertArrayNotHasKey('  a', $result, '  a');
++        $this->assertArrayNotHasKey('a  ', $result, 'a  ');
++    }
++
++    function test_splitter2 ()
++    {
++        $str = 'resumé';
++ 
++        $result = $this->x->_trigram($str);
++ 
++        $this->assertTrue(isset($result['mé ']), 'mé ');
++        $this->assertTrue(isset($result['umé']), 'umé');
++        $this->assertTrue(!isset($result['é  ']), 'é');
++
++        // tests lower-casing accented characters
++        $str = 'resumÉ';
++        
++        $result = $this->x->_trigram($str);
++ 
++        $this->assertTrue(isset($result['mé ']),'mé ');
++        $this->assertTrue(isset($result['umé']),'umé');
++        $this->assertTrue(!isset($result['é  ']),'é');
++    }
++
++    function test_sort ()
++    {
++        $arr = array('a' => 1, 'b' => 2, 'c' => 2);
++        $this->x->_bub_sort($arr);
++
++        $final_arr = array('b' => 2, 'c' => 2, 'a' => 1);
++
++        $this->assertEquals($final_arr, $arr);
++    }
++
++    function test_error ()
++    {
++        // this test passes the object a series of bad strings to see how it handles them
++
++        $result = $this->x->detectSimple("");
++
++        $this->assertTrue(!$result);
++
++        $result = $this->x->detectSimple("\n");
++
++        $this->assertTrue(!$result);
++
++        // should fail on extremely short strings
++        $result = $this->x->detectSimple("a");
++
++        $this->assertTrue(!$result);
++
++        $result = $this->x->detectSimple("aa");
++
++        $this->assertTrue(!$result);
++
++        $result = $this->x->detectSimple('xxxxxxxxxxxxxxxxxxx');
++
++        $this->assertEquals(null, $result);
++    }
++
++    function testOmitLanguages()
++    {
++        $str = 'This function may return Boolean FALSE, but may also return a non-Boolean value which evaluates to FALSE, such as 0 or "". Please read the section on Booleans for more information. Use the === operator for testing the return value of this function.';
++
++        $myobj = new Text_LanguageDetect;
++
++        $myobj->_use_unicode_narrowing = false;
++
++        $count = $myobj->getLanguageCount();
++        $returnval = $myobj->omitLanguages('english');
++        $newcount = $myobj->getLanguageCount();
++
++        $this->assertEquals(1, $returnval);
++        $this->assertEquals(1, $count - $newcount);
++
++        $result = strtolower($myobj->detectSimple($str));
++
++        $this->assertTrue($result != 'english', $result);
++
++        $myobj = new Text_LanguageDetect;
++
++        $count = $myobj->getLanguageCount();
++        $returnval = $myobj->omitLanguages(array('danish', 'italian'), true);
++        $newcount = $myobj->getLanguageCount();
++
++        $this->assertEquals($count - $newcount, $returnval);
++        $this->assertEquals($count - $returnval, $newcount);
++
++        $result = strtolower($myobj->detectSimple($str));
++
++        $this->assertTrue($result == 'danish' || $result == 'italian', $result);
++
++        $result = $myobj->detect($str);
++
++        $this->assertEquals(2, count($result));
++        $this->assertTrue(isset($result['danish']));
++        $this->assertTrue(isset($result['italian']));
++
++        unset($myobj);
++    }
++
++    function testOmitLanguagesNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(1, $this->x->omitLanguages('en'));
++    }
++
++    function testOmitLanguagesIncludeString()
++    {
++        $this->assertGreaterThan(1, $this->x->omitLanguages('english', true));
++        $langs = $this->x->getLanguages();
++        $this->assertEquals(1, count($langs));
++        $this->assertContains('english', $langs);
++    }
++
++    function testOmitLanguagesClearsClusterCache()
++    {
++        $this->x->omitLanguages(array('english', 'german'), true);
++        $this->assertNull($this->x->_clusters);
++        $this->x->clusterLanguages();
++        $this->assertNotNull($this->x->_clusters);
++        $this->x->omitLanguages('german');
++        $this->assertNull($this->x->_clusters, 'cluster cache be empty now');
++    }
++
++    function test_perl_compatibility()
++    {
++        // if this test fails, then many of the others will
++
++        $myobj = new Text_LanguageDetect;
++        $myobj->setPerlCompatible(true);
++
++        $testtext = "hello";
++
++        $result = $myobj->_trigram($testtext);
++
++        $this->assertTrue(!isset($result[' he']));
++    }
++
++    function test_french_db ()
++    {
++
++        $safe_model = array(
++            "es " => 0,     " de" => 1,     "de " => 2,     " le" => 3,     "ent" => 4,     
++            "le " => 5,     "nt " => 6,     "la " => 7,     "s d" => 8,     " la" => 9,     
++            "ion" => 10,     "on " => 11,     "re " => 12,     " pa" => 13,     "e l" => 14,     
++            "e d" => 15,     " l'" => 16,     "e p" => 17,     " co" => 18,     " pr" => 19,     
++            "tio" => 20,     "ns " => 21,     " en" => 22,     "ne " => 23,     "que" => 24,     
++            "r l" => 25,     "les" => 26,     "ur " => 27,     "en " => 28,     "ati" => 29,     
++            "ue " => 30,     " po" => 31,     " d'" => 32,     "par" => 33,     " a " => 34,     
++            "et " => 35,     "it " => 36,     " qu" => 37,     "men" => 38,     "ons" => 39,     
++            "te " => 40,     " et" => 41,     "t d" => 42,     " re" => 43,     "des" => 44,     
++            " un" => 45,     "ie " => 46,     "s l" => 47,     " su" => 48,     "pou" => 49,     
++            " au" => 50,     " à " => 51,     "con" => 52,     "er " => 53,     " no" => 54,     
++            "ait" => 55,     "e c" => 56,     "se " => 57,     "té " => 58,     "du " => 59,     
++            " du" => 60,     " dé" => 61,     "ce " => 62,     "e e" => 63,     "is " => 64,     
++            "n d" => 65,     "s a" => 66,     " so" => 67,     "e r" => 68,     "e s" => 69,     
++            "our" => 70,     "res" => 71,     "ssi" => 72,     "eur" => 73,     " se" => 74,     
++            "eme" => 75,     "est" => 76,     "us " => 77,     "sur" => 78,     "ant" => 79,     
++            "iqu" => 80,     "s p" => 81,     "une" => 82,     "uss" => 83,     "l'a" => 84,     
++            "pro" => 85,     "ter" => 86,     "tre" => 87,     "end" => 88,     "rs " => 89,     
++            " ce" => 90,     "e a" => 91,     "t p" => 92,     "un " => 93,     " ma" => 94,     
++            " ru" => 95,     " ré" => 96,     "ous" => 97,     "ris" => 98,     "rus" => 99,     
++            "sse" => 100,     "ans" => 101,     "ar " => 102,     "com" => 103,     "e m" => 104,     
++            "ire" => 105,     "nce" => 106,     "nte" => 107,     "t l" => 108,     " av" => 109,     
++            " mo" => 110,     " te" => 111,     "il " => 112,     "me " => 113,     "ont" => 114,     
++            "ten" => 115,     "a p" => 116,     "dan" => 117,     "pas" => 118,     "qui" => 119,     
++            "s e" => 120,     "s s" => 121,     " in" => 122,     "ist" => 123,     "lle" => 124,     
++            "nou" => 125,     "pré" => 126,     "'un" => 127,     "air" => 128,     "d'a" => 129,     
++            "ir " => 130,     "n e" => 131,     "rop" => 132,     "ts " => 133,     " da" => 134,     
++            "a s" => 135,     "as " => 136,     "au " => 137,     "den" => 138,     "mai" => 139,     
++            "mis" => 140,     "ori" => 141,     "out" => 142,     "rme" => 143,     "sio" => 144,     
++            "tte" => 145,     "ux " => 146,     "a d" => 147,     "ien" => 148,     "n a" => 149,     
++            "ntr" => 150,     "omm" => 151,     "ort" => 152,     "ouv" => 153,     "s c" => 154,     
++            "son" => 155,     "tes" => 156,     "ver" => 157,     "ère" => 158,     " il" => 159,     
++            " m " => 160,     " sa" => 161,     " ve" => 162,     "a r" => 163,     "ais" => 164,     
++            "ava" => 165,     "di " => 166,     "n p" => 167,     "sti" => 168,     "ven" => 169,     
++            " mi" => 170,     "ain" => 171,     "enc" => 172,     "for" => 173,     "ité" => 174,     
++            "lar" => 175,     "oir" => 176,     "rem" => 177,     "ren" => 178,     "rro" => 179,     
++            "rés" => 180,     "sie" => 181,     "t a" => 182,     "tur" => 183,     " pe" => 184,     
++            " to" => 185,     "d'u" => 186,     "ell" => 187,     "err" => 188,     "ers" => 189,     
++            "ide" => 190,     "ine" => 191,     "iss" => 192,     "mes" => 193,     "por" => 194,     
++            "ran" => 195,     "sit" => 196,     "st " => 197,     "t r" => 198,     "uti" => 199,     
++            "vai" => 200,     "é l" => 201,     "ési" => 202,     " di" => 203,     " n'" => 204,     
++            " ét" => 205,     "a c" => 206,     "ass" => 207,     "e t" => 208,     "in " => 209,     
++            "nde" => 210,     "pre" => 211,     "rat" => 212,     "s m" => 213,     "ste" => 214,     
++            "tai" => 215,     "tch" => 216,     "ui " => 217,     "uro" => 218,     "ès " => 219,     
++            " es" => 220,     " fo" => 221,     " tr" => 222,     "'ad" => 223,     "app" => 224,     
++            "aux" => 225,     "e à" => 226,     "ett" => 227,     "iti" => 228,     "lit" => 229,     
++            "nal" => 230,     "opé" => 231,     "r d" => 232,     "ra " => 233,     "rai" => 234,     
++            "ror" => 235,     "s r" => 236,     "tat" => 237,     "uté" => 238,     "à l" => 239,     
++            " af" => 240,     "anc" => 241,     "ara" => 242,     "art" => 243,     "bre" => 244,     
++            "ché" => 245,     "dre" => 246,     "e f" => 247,     "ens" => 248,     "lem" => 249,     
++            "n r" => 250,     "n t" => 251,     "ndr" => 252,     "nne" => 253,     "onn" => 254,     
++            "pos" => 255,     "s t" => 256,     "tiq" => 257,     "ure" => 258,     " tu" => 259,     
++            "ale" => 260,     "and" => 261,     "ave" => 262,     "cla" => 263,     "cou" => 264,     
++            "e n" => 265,     "emb" => 266,     "ins" => 267,     "jou" => 268,     "mme" => 269,     
++            "rie" => 270,     "rès" => 271,     "sem" => 272,     "str" => 273,     "t i" => 274,     
++            "ues" => 275,     "uni" => 276,     "uve" => 277,     "é d" => 278,     "ée " => 279,     
++            " ch" => 280,     " do" => 281,     " eu" => 282,     " fa" => 283,     " lo" => 284,     
++            " ne" => 285,     " ra" => 286,     "arl" => 287,     "att" => 288,     "ec " => 289,     
++            "ica" => 290,     "l a" => 291,     "l'o" => 292,     "l'é" => 293,     "mmi" => 294,     
++            "nta" => 295,     "orm" => 296,     "ou " => 297,     "r u" => 298,     "rle" => 299
++        );
++
++
++        $my_arr = $this->x->_lang_db['french'];
++
++        foreach ($safe_model as $key => $value) {
++            $this->assertTrue(isset($my_arr[$key]),$key);
++            if (isset($my_arr[$key])) {
++                $this->assertEquals($value, $my_arr[$key], $key);
++            }
++        }
++    }
++
++    function test_english_db ()
++    {
++
++        $realdb = array(
++            " th" => 0,     "the" => 1,     "he " => 2,     "ed " => 3,     " to" => 4,     
++            " in" => 5,     "er " => 6,     "ing" => 7,     "ng " => 8,     " an" => 9,     
++            "nd " => 10,     " of" => 11,     "and" => 12,     "to " => 13,     "of " => 14,     
++            " co" => 15,     "at " => 16,     "on " => 17,     "in " => 18,     " a " => 19,     
++            "d t" => 20,     " he" => 21,     "e t" => 22,     "ion" => 23,     "es " => 24,     
++            " re" => 25,     "re " => 26,     "hat" => 27,     " sa" => 28,     " st" => 29,     
++            " ha" => 30,     "her" => 31,     "tha" => 32,     "tio" => 33,     "or " => 34,     
++            " ''" => 35,     "en " => 36,     " wh" => 37,     "e s" => 38,     "ent" => 39,     
++            "n t" => 40,     "s a" => 41,     "as " => 42,     "for" => 43,     "is " => 44,     
++            "t t" => 45,     " be" => 46,     "ld " => 47,     "e a" => 48,     "rs " => 49,     
++            " wa" => 50,     "ut " => 51,     "ve " => 52,     "ll " => 53,     "al " => 54,     
++            " ma" => 55,     "e i" => 56,     " fo" => 57,     "'s " => 58,     "an " => 59,     
++            "est" => 60,     " hi" => 61,     " mo" => 62,     " se" => 63,     " pr" => 64,     
++            "s t" => 65,     "ate" => 66,     "st " => 67,     "ter" => 68,     "ere" => 69,     
++            "ted" => 70,     "nt " => 71,     "ver" => 72,     "d a" => 73,     " wi" => 74,     
++            "se " => 75,     "e c" => 76,     "ect" => 77,     "ns " => 78,     " on" => 79,     
++            "ly " => 80,     "tol" => 81,     "ey " => 82,     "r t" => 83,     " ca" => 84,     
++            "ati" => 85,     "ts " => 86,     "all" => 87,     " no" => 88,     "his" => 89,     
++            "s o" => 90,     "ers" => 91,     "con" => 92,     "e o" => 93,     "ear" => 94,     
++            "f t" => 95,     "e w" => 96,     "was" => 97,     "ons" => 98,     "sta" => 99,     
++            "'' " => 100,     "sti" => 101,     "n a" => 102,     "sto" => 103,     "t h" => 104,     
++            " we" => 105,     "id " => 106,     "th " => 107,     " it" => 108,     "ce " => 109,     
++            " di" => 110,     "ave" => 111,     "d h" => 112,     "cou" => 113,     "pro" => 114,     
++            "ad " => 115,     "oll" => 116,     "ry " => 117,     "d s" => 118,     "e m" => 119,     
++            " so" => 120,     "ill" => 121,     "cti" => 122,     "te " => 123,     "tor" => 124,     
++            "eve" => 125,     "g t" => 126,     "it " => 127,     " ch" => 128,     " de" => 129,     
++            "hav" => 130,     "oul" => 131,     "ty " => 132,     "uld" => 133,     "use" => 134,     
++            " al" => 135,     "are" => 136,     "ch " => 137,     "me " => 138,     "out" => 139,     
++            "ove" => 140,     "wit" => 141,     "ys " => 142,     "chi" => 143,     "t a" => 144,     
++            "ith" => 145,     "oth" => 146,     " ab" => 147,     " te" => 148,     " wo" => 149,     
++            "s s" => 150,     "res" => 151,     "t w" => 152,     "tin" => 153,     "e b" => 154,     
++            "e h" => 155,     "nce" => 156,     "t s" => 157,     "y t" => 158,     "e p" => 159,     
++            "ele" => 160,     "hin" => 161,     "s i" => 162,     "nte" => 163,     " li" => 164,     
++            "le " => 165,     " do" => 166,     "aid" => 167,     "hey" => 168,     "ne " => 169,     
++            "s w" => 170,     " as" => 171,     " fr" => 172,     " tr" => 173,     "end" => 174,     
++            "sai" => 175,     " el" => 176,     " ne" => 177,     " su" => 178,     "'t " => 179,     
++            "ay " => 180,     "hou" => 181,     "ive" => 182,     "lec" => 183,     "n't" => 184,     
++            " ye" => 185,     "but" => 186,     "d o" => 187,     "o t" => 188,     "y o" => 189,     
++            " ho" => 190,     " me" => 191,     "be " => 192,     "cal" => 193,     "e e" => 194,     
++            "had" => 195,     "ple" => 196,     " at" => 197,     " bu" => 198,     " la" => 199,     
++            "d b" => 200,     "s h" => 201,     "say" => 202,     "t i" => 203,     " ar" => 204,     
++            "e f" => 205,     "ght" => 206,     "hil" => 207,     "igh" => 208,     "int" => 209,     
++            "not" => 210,     "ren" => 211,     " is" => 212,     " pa" => 213,     " sh" => 214,     
++            "ays" => 215,     "com" => 216,     "n s" => 217,     "r a" => 218,     "rin" => 219,     
++            "y a" => 220,     " un" => 221,     "n c" => 222,     "om " => 223,     "thi" => 224,     
++            " mi" => 225,     "by " => 226,     "d i" => 227,     "e d" => 228,     "e n" => 229,     
++            "t o" => 230,     " by" => 231,     "e r" => 232,     "eri" => 233,     "old" => 234,     
++            "ome" => 235,     "whe" => 236,     "yea" => 237,     " gr" => 238,     "ar " => 239,     
++            "ity" => 240,     "mpl" => 241,     "oun" => 242,     "one" => 243,     "ow " => 244,     
++            "r s" => 245,     "s f" => 246,     "tat" => 247,     " ba" => 248,     " vo" => 249,     
++            "bou" => 250,     "sam" => 251,     "tim" => 252,     "vot" => 253,     "abo" => 254,     
++            "ant" => 255,     "ds " => 256,     "ial" => 257,     "ine" => 258,     "man" => 259,     
++            "men" => 260,     " or" => 261,     " po" => 262,     "amp" => 263,     "can" => 264,     
++            "der" => 265,     "e l" => 266,     "les" => 267,     "ny " => 268,     "ot " => 269,     
++            "rec" => 270,     "tes" => 271,     "tho" => 272,     "ica" => 273,     "ild" => 274,     
++            "ir " => 275,     "nde" => 276,     "ose" => 277,     "ous" => 278,     "pre" => 279,     
++            "ste" => 280,     "era" => 281,     "per" => 282,     "r o" => 283,     "red" => 284,     
++            "rie" => 285,     " bo" => 286,     " le" => 287,     "ali" => 288,     "ars" => 289,     
++            "ore" => 290,     "ric" => 291,     "s m" => 292,     "str" => 293,     " fa" => 294,     
++            "ess" => 295,     "ie " => 296,     "ist" => 297,     "lat" => 298,     "uri" => 299,
++        );
++
++        $mod = $this->x->_lang_db['english'];
++
++        foreach ($realdb as $key => $value) {
++            $this->assertTrue(isset($mod[$key]), $key);
++            if (isset($mod[$key])) {
++                $this->assertEquals($value, $mod[$key], $key);
++            }
++        }
++
++        foreach ($mod as $key => $value) {
++            $this->assertTrue(isset($realdb[$key]));
++            if (isset($realdb[$key])) {
++                $this->assertEquals($value, $realdb[$key], $key);
++            }
++        }
++    }
++
++    function test_confidence ()
++    {
++        $str = 'The next thing to notice is the Content-length header. The Content-length header notifies the server of the size of the data that you intend to send. This prevents unexpected end-of-data errors from the server when dealing with binary data, because the server will read the specified number of bytes from the data stream regardless of any spurious end-of-data characters.';
++
++        $result = $this->x->detectConfidence($str);
++
++        $this->assertEquals(3, count($result));
++        $this->assertTrue(isset($result['language']), 'language');
++        $this->assertTrue(isset($result['similarity']), 'similarity');
++        $this->assertTrue(isset($result['confidence']), 'confidence');
++        $this->assertEquals('english', $result['language']);
++        $this->assertTrue($result['similarity'] <= 300 && $result['similarity'] >= 0, $result['similarity']);
++        $this->assertTrue($result['confidence'] <= 1 && $result['confidence'] >= 0, $result['confidence']);
++
++        // todo: tests for Danish and Norwegian should have lower confidence
++    }
++
++    function test_long_example ()
++    {
++    // an example that is more than 300 trigrams long
++        $str = 'The Italian Renaissance began the opening phase of the Renaissance, a period of great cultural change and achievement from the 14th to the 16th century. The word renaissance means "rebirth," and the era is best known for the renewed interest in the culture of classical antiquity. The Italian Renaissance began in northern Italy, centering in Florence. It then spread south, having an especially significant impact on Rome, which was largely rebuilt by the Renaissance popes. The Italian Renaissance is best known for its cultural achievements. This includes works of literature by such figures as Petrarch, Castiglione, and Machiavelli; artists such as Michaelangelo and Leonardo da Vinci, and great works of architecture such as The Duomo in Florence and St. Peter\'s Basilica in Rome. At the same time, present-day historians also see the era as one of economic regression and of little progress in science. Furthermore, some historians argue that the lot of the peasants and urban poor, the majority of the population, worsened during this period.';
++    
++        $this->x->setPerlCompatible();
++        $tri = $this->x->_trigram($str);
++        
++        $exp_tri = array(
++            ' th',
++            'the',
++            'he ',
++            ' an',
++            ' re',
++            ' of',
++            'ce ',
++            'nce',
++            'of ',
++            'ren',
++            ' in',
++            'and',
++            'nd ',
++            'an ',
++            'san',
++            ' it',
++            'ais',
++            'anc',
++            'ena',
++            'in ',
++            'iss',
++            'nai',
++            'ssa',
++            'tur',
++            ' pe',
++            'as ',
++            'ch ',
++            'ent',
++            'ian',
++            'me ',
++            'n r',
++            'res',
++            ' as',
++            ' be',
++            ' wo',
++            'at ',
++            'chi',
++            'e i',
++            'e o',
++            'e p',
++            'gre',
++            'his',
++            'ing',
++            'is ',
++            'ita',
++            'n f',
++            'ng ',
++            're ',
++            's a',
++            'st ',
++            'tal',
++            'ter',
++            'th ',
++            'ts ',
++            'ure',
++            'wor',
++            ' ar',
++            ' cu',
++            ' po',
++            ' su',
++            'ach',
++            'al ',
++            'ali',
++            'ans',
++            'ant',
++            'cul',
++            'e b',
++            'e r',
++            'e t',
++            'enc',
++            'era',
++            'eri',
++            'es ',
++            'est',
++            'f t',
++            'ica',
++            'ion',
++            'ist',
++            'lia',
++            'ltu',
++            'ly ',
++            'ns ',
++            'nt ',
++            'ome',
++            'on ',
++            'or ',
++            'ore',
++            'ori',
++            'rea',
++            'rom',
++            'rth',
++            's b',
++            's o',
++            'suc',
++            't t',
++            'uch',
++            'ult',
++            ' ac',
++            ' by',
++            ' ce',
++            ' da',
++            ' du',
++            ' er',
++            ' fl',
++            ' fo',
++            ' gr',
++            ' hi',
++            ' is',
++            ' kn',
++            ' li',
++            ' ma',
++            ' on',
++            ' pr',
++            ' ro',
++            ' so',
++            'a i',
++            'ang',
++            'arc',
++            'arg',
++            'beg',
++            'bes',
++            'by ',
++            'cen',
++            'cha',
++            'd o',
++            'd s',
++            'e a',
++            'e e',
++            'e m',
++            'e s',
++            'eat',
++            'ed ',
++            'ega',
++            'eme',
++            'ene',
++            'ess',
++            'eve',
++            'f l',
++            'flo',
++            'for',
++            'gan',
++            'gel',
++            'h a',
++            'her',
++            'hie',
++            'ich',
++            'iev',
++            'inc',
++            'iod',
++            'ite',
++            'ity',
++            'kno',
++            'ks ',
++            'l a',
++            'lit',
++            'lor',
++            'men',
++            'mic',
++            'n i',
++            'n s',
++            'n t',
++            'ne ',
++            'nge',
++            'now',
++            'nte',
++            'nts',
++            'od ',
++            'one',
++            'ope',
++            'ork',
++            'own',
++            'per',
++            'pet',
++            'pop',
++            'pre',
++            'ra ',
++            'ral',
++            'rch',
++            'reb',
++            'ria',
++            'rin',
++            'rio',
++            'rks',
++            's i',
++            's p',
++            'sen',
++            'ssi',
++            'sto',
++            't i',
++            't k',
++            't o',
++            'thi',
++            'tor',
++            'ty ',
++            'ura',
++            'vem',
++            'vin',
++            'wn ',
++            'y s',
++            ' a ',
++            ' al',
++            ' at',
++            ' ba',
++            ' ca',
++            ' ch',
++            ' cl',
++            ' ec',
++            ' es',
++            ' fi',
++            ' fr',
++            ' fu',
++            ' ha',
++            ' im',
++            ' la',
++            ' le',
++            ' lo',
++            ' me',
++            ' mi',
++            ' no',
++            ' op',
++            ' ph',
++            ' sa',
++            ' sc',
++            ' se',
++            ' si',
++            ' sp',
++            ' st',
++            ' ti',
++            ' to',
++            ' ur',
++            ' vi',
++            ' wa',
++            ' wh',
++            '\'s ',
++            'a a',
++            'a p',
++            'a v',
++            'act',
++            'ad ',
++            'ael',
++            'ajo',
++            'all',
++            'als',
++            'aly',
++            'ame',
++            'ard',
++            'art',
++            'asa',
++            'ase',
++            'asi',
++            'ass',
++            'ast',
++            'ati',
++            'atu',
++            'ave',
++            'avi',
++            'ay ',
++            'ban',
++            'bas',
++            'bir',
++            'bui',
++            'c r',
++            'ca ',
++            'cal',
++            'can',
++            'cas',
++            'ci ',
++            'cia',
++            'cie',
++            'cla',
++            'clu',
++            'con',
++            'ct ',
++            'ctu',
++            'd a',
++            'd d',
++            'd g',
++            'd i',
++            'd l',
++            'd m',
++            'd r',
++            'd t',
++            'd u',
++            'da ',
++            'day',
++            'des',
++            'do ',
++            'duo',
++            'dur',
++            'e c',
++            'e d',
++            'e h',
++            'e l',
++            'e w',
++            'ead',
++            'ean',
++            'eas',
++            'ebi',
++            'ebu',
++            'eci',
++            'eco',
++            'ect',
++            'ee ',
++            'egr',
++            'ela',
++            'ell',
++            'elo',
++            'ely',
++            'en ',
++            'eni',
++            'eon',
++            'er\'',
++            'ere',
++            'erm',
++            'ern',
++            'ese',
++            'esp',
++            'ete',
++            'etr',
++            'ewe',
++            'f a',
++            'f c',
++            'f e',
++            'f g',
++            'fic',
++            'fig',
++            'fro',
++            'fur',
++            'g a',
++            'g i',
++            'g p',
++            'g t',
++            'ge ',
++            'gli',
++            'gni',
++            'gue',
++            'gur',
++            'h c',
++            'h f',
++            'h t',
++            'h w',
++            'hae',
++            'han',
++            'has',
++            'hat',
++            'hav',
++            'hen',
++            'hia',
++            'hic',
++            'hit',
++            'ial',
++            'iav',
++            'ic ',
++            'ien',
++            'ifi',
++            'igl',
++            'ign',
++            'igu',
++            'ili',
++            'ilt',
++            'ime',
++            'imp',
++            'int',
++            'iqu',
++            'irt',
++            'it ',
++            'its',
++            'itt',
++            'jor',
++            'l c',
++            'lan',
++            'lar',
++            'las',
++            'lat',
++            'le ',
++            'leo',
++            'li ',
++            'lic',
++            'lio',
++            'lli',
++            'lly',
++            'lo ',
++            'lot',
++            'lso',
++            'lt ',
++            'lud',
++            'm t',
++            'mac',
++            'maj',
++            'mea',
++            'mo ',
++            'mor',
++            'mpa',
++            'n a',
++            'n e',
++            'n n',
++            'n p',
++            'nar',
++            'nci',
++            'ncl',
++            'ned',
++            'new',
++            'nif',
++            'nin',
++            'nom',
++            'nor',
++            'nti',
++            'ntu',
++            'o a',
++            'o d',
++            'o i',
++            'o s',
++            'o t',
++            'ogr',
++            'om ',
++            'omi',
++            'omo',
++            'ona',
++            'ono',
++            'oor',
++            'opu',
++            'ord',
++            'ors',
++            'ort',
++            'ot ',
++            'out',
++            'pac',
++            'pea',
++            'pec',
++            'pen',
++            'pes',
++            'pha',
++            'poo',
++            'pro',
++            'pul',
++            'qui',
++            'r i',
++            'r t',
++            'r\'s',
++            'rar',
++            'rat',
++            'rba',
++            'rd ',
++            'rdo',
++            'reg',
++            'rge',
++            'rgu',
++            'rit',
++            'rmo',
++            'rn ',
++            'rog',
++            'rse',
++            'rti',
++            'ry ',
++            's c',
++            's l',
++            's m',
++            's s',
++            's t',
++            's w',
++            'sam',
++            'sci',
++            'se ',
++            'see',
++            'sic',
++            'sig',
++            'sil',
++            'sio',
++            'so ',
++            'som',
++            'sou',
++            'spe',
++            'spr',
++            'ss ',
++            'sti',
++            'sts',
++            't b',
++            't c',
++            't d',
++            't f',
++            't w',
++            'tec',
++            'tha',
++            'tig',
++            'tim',
++            'tio',
++            'tiq',
++            'tis',
++            'tle',
++            'to ',
++            'tra',
++            'ttl',
++            'ude',
++            'ue ',
++            'uil',
++            'uit',
++            'ula',
++            'uom',
++            'urb',
++            'uri',
++            'urt',
++            'ury',
++            'uth',
++            'vel',
++            'was',
++            'wed',
++            'whi',
++            'y h',
++            'y o',
++            'y r',
++            'y t'
++        );
++
++        $differences = array_diff(array_keys($tri), $exp_tri);
++        $this->assertEquals(0, count($differences));
++        $this->assertEquals(0, count(array_diff($exp_tri, array_keys($tri))));
++        $this->assertEquals(count($exp_tri), count($tri));
++        //print_r(array_diff($exp_tri, array_keys($tri)));
++        //print_r(array_diff(array_keys($tri), $exp_tri));
++
++        // tests the bubble sort mechanism
++        $this->x->_bub_sort($tri);
++        $this->assertEquals($exp_tri, array_keys($tri));
++
++        $true_differences = array(
++            "cas" => array('change' => 300, 'baserank' => 265, 'refrank' => null),    "s i" => array('change' => 21, 'baserank' => 183, 'refrank' => 162),
++            "e b" => array('change' => 88, 'baserank' => 66, 'refrank' => 154),       "ent" => array('change' => 12, 'baserank' => 27, 'refrank' => 39),
++            "ome" => array('change' => 152, 'baserank' => 83, 'refrank' => 235),      "ral" => array('change' => 300, 'baserank' => 176, 'refrank' => null),
++            "ita" => array('change' => 300, 'baserank' => 44, 'refrank' => null),     "bas" => array('change' => 300, 'baserank' => 258, 'refrank' => null),
++            " ar" => array('change' => 148, 'baserank' => 56, 'refrank' => 204),      " in" => array('change' => 5, 'baserank' => 10, 'refrank' => 5),
++            " ti" => array('change' => 300, 'baserank' => 227, 'refrank' => null),    "ty " => array('change' => 61, 'baserank' => 193, 'refrank' => 132),
++            "tur" => array('change' => 300, 'baserank' => 23, 'refrank' => null),     "iss" => array('change' => 300, 'baserank' => 20, 'refrank' => null),
++            "ria" => array('change' => 300, 'baserank' => 179, 'refrank' => null),    " me" => array('change' => 25, 'baserank' => 216, 'refrank' => 191),
++            "t k" => array('change' => 300, 'baserank' => 189, 'refrank' => null),    " es" => array('change' => 300, 'baserank' => 207, 'refrank' => null),
++            "ren" => array('change' => 202, 'baserank' => 9, 'refrank' => 211),       "in " => array('change' => 1, 'baserank' => 19, 'refrank' => 18),
++            "ly " => array('change' => 0, 'baserank' => 80, 'refrank' => 80), "st " => array('change' => 18, 'baserank' => 49, 'refrank' => 67),
++            "ne " => array('change' => 8, 'baserank' => 161, 'refrank' => 169),       "all" => array('change' => 154, 'baserank' => 241, 'refrank' => 87),
++            "vin" => array('change' => 300, 'baserank' => 196, 'refrank' => null),    " op" => array('change' => 300, 'baserank' => 219, 'refrank' => null),
++            "chi" => array('change' => 107, 'baserank' => 36, 'refrank' => 143),      "e w" => array('change' => 197, 'baserank' => 293, 'refrank' => 96),
++            " ro" => array('change' => 300, 'baserank' => 113, 'refrank' => null),    "act" => array('change' => 300, 'baserank' => 237, 'refrank' => null),
++            "d r" => array('change' => 300, 'baserank' => 280, 'refrank' => null),    "nt " => array('change' => 11, 'baserank' => 82, 'refrank' => 71),
++            "can" => array('change' => 0, 'baserank' => 264, 'refrank' => 264),       "rea" => array('change' => 300, 'baserank' => 88, 'refrank' => null),
++            "ssa" => array('change' => 300, 'baserank' => 22, 'refrank' => null),     " fo" => array('change' => 47, 'baserank' => 104, 'refrank' => 57),
++            "eas" => array('change' => 300, 'baserank' => 296, 'refrank' => null),    "mic" => array('change' => 300, 'baserank' => 157, 'refrank' => null),
++            "cul" => array('change' => 300, 'baserank' => 65, 'refrank' => null),     " an" => array('change' => 6, 'baserank' => 3, 'refrank' => 9),
++            "n t" => array('change' => 120, 'baserank' => 160, 'refrank' => 40),      "arg" => array('change' => 300, 'baserank' => 118, 'refrank' => null),
++            " it" => array('change' => 93, 'baserank' => 15, 'refrank' => 108),       "ebi" => array('change' => 300, 'baserank' => 297, 'refrank' => null),
++            " re" => array('change' => 21, 'baserank' => 4, 'refrank' => 25), "res" => array('change' => 120, 'baserank' => 31, 'refrank' => 151),
++            " be" => array('change' => 13, 'baserank' => 33, 'refrank' => 46),        "rom" => array('change' => 300, 'baserank' => 89, 'refrank' => null),
++            "'s " => array('change' => 175, 'baserank' => 233, 'refrank' => 58),      "arc" => array('change' => 300, 'baserank' => 117, 'refrank' => null),
++            " su" => array('change' => 119, 'baserank' => 59, 'refrank' => 178),      "s p" => array('change' => 300, 'baserank' => 184, 'refrank' => null),
++            "ich" => array('change' => 300, 'baserank' => 145, 'refrank' => null),    "d d" => array('change' => 300, 'baserank' => 275, 'refrank' => null),
++            "cal" => array('change' => 70, 'baserank' => 263, 'refrank' => 193),      "ci " => array('change' => 300, 'baserank' => 266, 'refrank' => null),
++            "ssi" => array('change' => 300, 'baserank' => 186, 'refrank' => null),    "bes" => array('change' => 300, 'baserank' => 120, 'refrank' => null),
++            "des" => array('change' => 300, 'baserank' => 285, 'refrank' => null),    "e s" => array('change' => 91, 'baserank' => 129, 'refrank' => 38),
++            "ch " => array('change' => 111, 'baserank' => 26, 'refrank' => 137),      "san" => array('change' => 300, 'baserank' => 14, 'refrank' => null),
++            "asi" => array('change' => 300, 'baserank' => 249, 'refrank' => null),    "ajo" => array('change' => 300, 'baserank' => 240, 'refrank' => null),
++            "ase" => array('change' => 300, 'baserank' => 248, 'refrank' => null),    " wa" => array('change' => 181, 'baserank' => 231, 'refrank' => 50),
++            "vem" => array('change' => 300, 'baserank' => 195, 'refrank' => null),    "ed " => array('change' => 128, 'baserank' => 131, 'refrank' => 3),
++            "ant" => array('change' => 191, 'baserank' => 64, 'refrank' => 255),      "a p" => array('change' => 300, 'baserank' => 235, 'refrank' => null),
++            "lor" => array('change' => 300, 'baserank' => 155, 'refrank' => null),    "kno" => array('change' => 300, 'baserank' => 151, 'refrank' => null),
++            "ais" => array('change' => 300, 'baserank' => 16, 'refrank' => null),     " pe" => array('change' => 300, 'baserank' => 24, 'refrank' => null),
++            "or " => array('change' => 51, 'baserank' => 85, 'refrank' => 34),        "e i" => array('change' => 19, 'baserank' => 37, 'refrank' => 56),
++            " sp" => array('change' => 300, 'baserank' => 225, 'refrank' => null),    "ad " => array('change' => 123, 'baserank' => 238, 'refrank' => 115),
++            " kn" => array('change' => 300, 'baserank' => 108, 'refrank' => null),    "ega" => array('change' => 300, 'baserank' => 132, 'refrank' => null),
++            " ba" => array('change' => 46, 'baserank' => 202, 'refrank' => 248),      "d t" => array('change' => 261, 'baserank' => 281, 'refrank' => 20),
++            "ork" => array('change' => 300, 'baserank' => 169, 'refrank' => null),    "lia" => array('change' => 300, 'baserank' => 78, 'refrank' => null),
++            "ard" => array('change' => 300, 'baserank' => 245, 'refrank' => null),    "iev" => array('change' => 300, 'baserank' => 146, 'refrank' => null),
++            "of " => array('change' => 6, 'baserank' => 8, 'refrank' => 14),  " cu" => array('change' => 300, 'baserank' => 57, 'refrank' => null),
++            "day" => array('change' => 300, 'baserank' => 284, 'refrank' => null),    "cen" => array('change' => 300, 'baserank' => 122, 'refrank' => null),
++            "re " => array('change' => 21, 'baserank' => 47, 'refrank' => 26),        "ist" => array('change' => 220, 'baserank' => 77, 'refrank' => 297),
++            " fl" => array('change' => 300, 'baserank' => 103, 'refrank' => null),    "anc" => array('change' => 300, 'baserank' => 17, 'refrank' => null),
++            "at " => array('change' => 19, 'baserank' => 35, 'refrank' => 16),        "rch" => array('change' => 300, 'baserank' => 177, 'refrank' => null),
++            "ang" => array('change' => 300, 'baserank' => 116, 'refrank' => null),    " mi" => array('change' => 8, 'baserank' => 217, 'refrank' => 225),
++            "y s" => array('change' => 300, 'baserank' => 198, 'refrank' => null),    "ca " => array('change' => 300, 'baserank' => 262, 'refrank' => null),
++            " ma" => array('change' => 55, 'baserank' => 110, 'refrank' => 55),       " lo" => array('change' => 300, 'baserank' => 215, 'refrank' => null),
++            "rin" => array('change' => 39, 'baserank' => 180, 'refrank' => 219),      " im" => array('change' => 300, 'baserank' => 212, 'refrank' => null),
++            " er" => array('change' => 300, 'baserank' => 102, 'refrank' => null),    "ce " => array('change' => 103, 'baserank' => 6, 'refrank' => 109),
++            "bui" => array('change' => 300, 'baserank' => 260, 'refrank' => null),    "lit" => array('change' => 300, 'baserank' => 154, 'refrank' => null),
++            "iod" => array('change' => 300, 'baserank' => 148, 'refrank' => null),    "ame" => array('change' => 300, 'baserank' => 244, 'refrank' => null),
++            "ter" => array('change' => 17, 'baserank' => 51, 'refrank' => 68),        "e a" => array('change' => 78, 'baserank' => 126, 'refrank' => 48),
++            "f l" => array('change' => 300, 'baserank' => 137, 'refrank' => null),    "eri" => array('change' => 162, 'baserank' => 71, 'refrank' => 233),
++            "ra " => array('change' => 300, 'baserank' => 175, 'refrank' => null),    "ng " => array('change' => 38, 'baserank' => 46, 'refrank' => 8),
++            "d i" => array('change' => 50, 'baserank' => 277, 'refrank' => 227),      "asa" => array('change' => 300, 'baserank' => 247, 'refrank' => null),
++            "wn " => array('change' => 300, 'baserank' => 197, 'refrank' => null),    " at" => array('change' => 4, 'baserank' => 201, 'refrank' => 197),
++            "now" => array('change' => 300, 'baserank' => 163, 'refrank' => null),    " by" => array('change' => 133, 'baserank' => 98, 'refrank' => 231),
++            "n s" => array('change' => 58, 'baserank' => 159, 'refrank' => 217),      " li" => array('change' => 55, 'baserank' => 109, 'refrank' => 164),
++            "l a" => array('change' => 300, 'baserank' => 153, 'refrank' => null),    "da " => array('change' => 300, 'baserank' => 283, 'refrank' => null),
++            "ean" => array('change' => 300, 'baserank' => 295, 'refrank' => null),    "tal" => array('change' => 300, 'baserank' => 50, 'refrank' => null),
++            "d a" => array('change' => 201, 'baserank' => 274, 'refrank' => 73),      "ct " => array('change' => 300, 'baserank' => 272, 'refrank' => null),
++            "ali" => array('change' => 226, 'baserank' => 62, 'refrank' => 288),      "ian" => array('change' => 300, 'baserank' => 28, 'refrank' => null),
++            " sa" => array('change' => 193, 'baserank' => 221, 'refrank' => 28),      "do " => array('change' => 300, 'baserank' => 286, 'refrank' => null),
++            "t o" => array('change' => 40, 'baserank' => 190, 'refrank' => 230),      "ure" => array('change' => 300, 'baserank' => 54, 'refrank' => null),
++            "e c" => array('change' => 213, 'baserank' => 289, 'refrank' => 76),      "ing" => array('change' => 35, 'baserank' => 42, 'refrank' => 7),
++            "d o" => array('change' => 63, 'baserank' => 124, 'refrank' => 187),      " ha" => array('change' => 181, 'baserank' => 211, 'refrank' => 30),
++            "ts " => array('change' => 33, 'baserank' => 53, 'refrank' => 86),        "rth" => array('change' => 300, 'baserank' => 90, 'refrank' => null),
++            "cla" => array('change' => 300, 'baserank' => 269, 'refrank' => null),    " ac" => array('change' => 300, 'baserank' => 97, 'refrank' => null),
++            "th " => array('change' => 55, 'baserank' => 52, 'refrank' => 107),       "rio" => array('change' => 300, 'baserank' => 181, 'refrank' => null),
++            "al " => array('change' => 7, 'baserank' => 61, 'refrank' => 54), "sto" => array('change' => 84, 'baserank' => 187, 'refrank' => 103),
++            "e o" => array('change' => 55, 'baserank' => 38, 'refrank' => 93),        "bir" => array('change' => 300, 'baserank' => 259, 'refrank' => null),
++            " pr" => array('change' => 48, 'baserank' => 112, 'refrank' => 64),       " le" => array('change' => 73, 'baserank' => 214, 'refrank' => 287),
++            "nai" => array('change' => 300, 'baserank' => 21, 'refrank' => null),     "t i" => array('change' => 15, 'baserank' => 188, 'refrank' => 203),
++            " po" => array('change' => 204, 'baserank' => 58, 'refrank' => 262),      "f t" => array('change' => 21, 'baserank' => 74, 'refrank' => 95),
++            "ban" => array('change' => 300, 'baserank' => 257, 'refrank' => null),    "an " => array('change' => 46, 'baserank' => 13, 'refrank' => 59),
++            "wor" => array('change' => 300, 'baserank' => 55, 'refrank' => null),     "pet" => array('change' => 300, 'baserank' => 172, 'refrank' => null),
++            "ael" => array('change' => 300, 'baserank' => 239, 'refrank' => null),    "ura" => array('change' => 300, 'baserank' => 194, 'refrank' => null),
++            "eve" => array('change' => 11, 'baserank' => 136, 'refrank' => 125),      "ion" => array('change' => 53, 'baserank' => 76, 'refrank' => 23),
++            "nge" => array('change' => 300, 'baserank' => 162, 'refrank' => null),    "cha" => array('change' => 300, 'baserank' => 123, 'refrank' => null),
++            "ity" => array('change' => 90, 'baserank' => 150, 'refrank' => 240),      " se" => array('change' => 160, 'baserank' => 223, 'refrank' => 63),
++            " on" => array('change' => 32, 'baserank' => 111, 'refrank' => 79),       "s b" => array('change' => 300, 'baserank' => 91, 'refrank' => null),
++            "ans" => array('change' => 300, 'baserank' => 63, 'refrank' => null),     "own" => array('change' => 300, 'baserank' => 170, 'refrank' => null),
++            " si" => array('change' => 300, 'baserank' => 224, 'refrank' => null),    "e r" => array('change' => 165, 'baserank' => 67, 'refrank' => 232),
++            "est" => array('change' => 13, 'baserank' => 73, 'refrank' => 60),        "hie" => array('change' => 300, 'baserank' => 144, 'refrank' => null),
++            "aly" => array('change' => 300, 'baserank' => 243, 'refrank' => null),    "and" => array('change' => 1, 'baserank' => 11, 'refrank' => 12),
++            "beg" => array('change' => 300, 'baserank' => 119, 'refrank' => null),    "dur" => array('change' => 300, 'baserank' => 288, 'refrank' => null),
++            "reb" => array('change' => 300, 'baserank' => 178, 'refrank' => null),    "e e" => array('change' => 67, 'baserank' => 127, 'refrank' => 194),
++            "men" => array('change' => 104, 'baserank' => 156, 'refrank' => 260),     " la" => array('change' => 14, 'baserank' => 213, 'refrank' => 199),
++            "con" => array('change' => 179, 'baserank' => 271, 'refrank' => 92),      " fu" => array('change' => 300, 'baserank' => 210, 'refrank' => null),
++            "e l" => array('change' => 26, 'baserank' => 292, 'refrank' => 266),      "s a" => array('change' => 7, 'baserank' => 48, 'refrank' => 41),
++            "art" => array('change' => 300, 'baserank' => 246, 'refrank' => null),    "ltu" => array('change' => 300, 'baserank' => 79, 'refrank' => null),
++            "a i" => array('change' => 300, 'baserank' => 115, 'refrank' => null),    "ctu" => array('change' => 300, 'baserank' => 273, 'refrank' => null),
++            "tor" => array('change' => 68, 'baserank' => 192, 'refrank' => 124),      "ach" => array('change' => 300, 'baserank' => 60, 'refrank' => null),
++            "d g" => array('change' => 300, 'baserank' => 276, 'refrank' => null),    "od " => array('change' => 300, 'baserank' => 166, 'refrank' => null),
++            "nte" => array('change' => 1, 'baserank' => 164, 'refrank' => 163),       "ena" => array('change' => 300, 'baserank' => 18, 'refrank' => null),
++            "d l" => array('change' => 300, 'baserank' => 278, 'refrank' => null),    "ene" => array('change' => 300, 'baserank' => 134, 'refrank' => null),
++            "e h" => array('change' => 136, 'baserank' => 291, 'refrank' => 155),     "era" => array('change' => 211, 'baserank' => 70, 'refrank' => 281),
++            "on " => array('change' => 67, 'baserank' => 84, 'refrank' => 17),        " ce" => array('change' => 300, 'baserank' => 99, 'refrank' => null),
++            "ay " => array('change' => 76, 'baserank' => 256, 'refrank' => 180),      " da" => array('change' => 300, 'baserank' => 100, 'refrank' => null),
++            "ori" => array('change' => 300, 'baserank' => 87, 'refrank' => null),     "atu" => array('change' => 300, 'baserank' => 253, 'refrank' => null),
++            "ave" => array('change' => 143, 'baserank' => 254, 'refrank' => 111),     "rks" => array('change' => 300, 'baserank' => 182, 'refrank' => null),
++            "e d" => array('change' => 62, 'baserank' => 290, 'refrank' => 228),      "ns " => array('change' => 3, 'baserank' => 81, 'refrank' => 78),
++            " ca" => array('change' => 119, 'baserank' => 203, 'refrank' => 84),      "d s" => array('change' => 7, 'baserank' => 125, 'refrank' => 118),
++            "uch" => array('change' => 300, 'baserank' => 95, 'refrank' => null),     "a v" => array('change' => 300, 'baserank' => 236, 'refrank' => null),
++            "nce" => array('change' => 149, 'baserank' => 7, 'refrank' => 156),       "his" => array('change' => 48, 'baserank' => 41, 'refrank' => 89),
++            "flo" => array('change' => 300, 'baserank' => 138, 'refrank' => null),    "ead" => array('change' => 300, 'baserank' => 294, 'refrank' => null),
++            " vi" => array('change' => 300, 'baserank' => 230, 'refrank' => null),    "me " => array('change' => 109, 'baserank' => 29, 'refrank' => 138),
++            "suc" => array('change' => 300, 'baserank' => 93, 'refrank' => null),     "e p" => array('change' => 120, 'baserank' => 39, 'refrank' => 159),
++            "eci" => array('change' => 300, 'baserank' => 299, 'refrank' => null),    "eme" => array('change' => 300, 'baserank' => 133, 'refrank' => null),
++            "sen" => array('change' => 300, 'baserank' => 185, 'refrank' => null),    "ks " => array('change' => 300, 'baserank' => 152, 'refrank' => null),
++            " to" => array('change' => 224, 'baserank' => 228, 'refrank' => 4),       " gr" => array('change' => 133, 'baserank' => 105, 'refrank' => 238),
++            " ch" => array('change' => 76, 'baserank' => 204, 'refrank' => 128),      "ati" => array('change' => 167, 'baserank' => 252, 'refrank' => 85),
++            " th" => array('change' => 0, 'baserank' => 0, 'refrank' => 0),   " ec" => array('change' => 300, 'baserank' => 206, 'refrank' => null),
++            " wo" => array('change' => 115, 'baserank' => 34, 'refrank' => 149),      "ope" => array('change' => 300, 'baserank' => 168, 'refrank' => null),
++            " a " => array('change' => 180, 'baserank' => 199, 'refrank' => 19),      "one" => array('change' => 76, 'baserank' => 167, 'refrank' => 243),
++            "n f" => array('change' => 300, 'baserank' => 45, 'refrank' => null),     "eat" => array('change' => 300, 'baserank' => 130, 'refrank' => null),
++            "ica" => array('change' => 198, 'baserank' => 75, 'refrank' => 273),      "inc" => array('change' => 300, 'baserank' => 147, 'refrank' => null),
++            "enc" => array('change' => 300, 'baserank' => 69, 'refrank' => null),     "ore" => array('change' => 204, 'baserank' => 86, 'refrank' => 290),
++            "is " => array('change' => 1, 'baserank' => 43, 'refrank' => 44), " as" => array('change' => 139, 'baserank' => 32, 'refrank' => 171),
++            "nts" => array('change' => 300, 'baserank' => 165, 'refrank' => null),    "d m" => array('change' => 300, 'baserank' => 279, 'refrank' => null),
++            "her" => array('change' => 112, 'baserank' => 143, 'refrank' => 31),      " al" => array('change' => 65, 'baserank' => 200, 'refrank' => 135),
++            " is" => array('change' => 105, 'baserank' => 107, 'refrank' => 212),     "e t" => array('change' => 46, 'baserank' => 68, 'refrank' => 22),
++            "c r" => array('change' => 300, 'baserank' => 261, 'refrank' => null),    " hi" => array('change' => 45, 'baserank' => 106, 'refrank' => 61),
++            "cia" => array('change' => 300, 'baserank' => 267, 'refrank' => null),    " fr" => array('change' => 37, 'baserank' => 209, 'refrank' => 172),
++            "ult" => array('change' => 300, 'baserank' => 96, 'refrank' => null),     "e m" => array('change' => 9, 'baserank' => 128, 'refrank' => 119),
++            "ass" => array('change' => 300, 'baserank' => 250, 'refrank' => null),    "s o" => array('change' => 2, 'baserank' => 92, 'refrank' => 90),
++            "pop" => array('change' => 300, 'baserank' => 173, 'refrank' => null),    "nd " => array('change' => 2, 'baserank' => 12, 'refrank' => 10),
++            "the" => array('change' => 0, 'baserank' => 1, 'refrank' => 1),   " st" => array('change' => 197, 'baserank' => 226, 'refrank' => 29),
++            " no" => array('change' => 130, 'baserank' => 218, 'refrank' => 88),      "ast" => array('change' => 300, 'baserank' => 251, 'refrank' => null),
++            " fi" => array('change' => 300, 'baserank' => 208, 'refrank' => null),    "ess" => array('change' => 160, 'baserank' => 135, 'refrank' => 295),
++            "gre" => array('change' => 300, 'baserank' => 40, 'refrank' => null),     "h a" => array('change' => 300, 'baserank' => 142, 'refrank' => null),
++            "duo" => array('change' => 300, 'baserank' => 287, 'refrank' => null),    " so" => array('change' => 6, 'baserank' => 114, 'refrank' => 120),
++            "es " => array('change' => 48, 'baserank' => 72, 'refrank' => 24),        "for" => array('change' => 96, 'baserank' => 139, 'refrank' => 43),
++            "gan" => array('change' => 300, 'baserank' => 140, 'refrank' => null),    "per" => array('change' => 111, 'baserank' => 171, 'refrank' => 282),
++            "thi" => array('change' => 33, 'baserank' => 191, 'refrank' => 224),      " of" => array('change' => 6, 'baserank' => 5, 'refrank' => 11),
++            " cl" => array('change' => 300, 'baserank' => 205, 'refrank' => null),    " sc" => array('change' => 300, 'baserank' => 222, 'refrank' => null),
++            "t t" => array('change' => 49, 'baserank' => 94, 'refrank' => 45),        "als" => array('change' => 300, 'baserank' => 242, 'refrank' => null),
++            "avi" => array('change' => 300, 'baserank' => 255, 'refrank' => null),    "cie" => array('change' => 300, 'baserank' => 268, 'refrank' => null),
++            " du" => array('change' => 300, 'baserank' => 101, 'refrank' => null),    "pre" => array('change' => 105, 'baserank' => 174, 'refrank' => 279),
++            "as " => array('change' => 17, 'baserank' => 25, 'refrank' => 42),        "a a" => array('change' => 300, 'baserank' => 234, 'refrank' => null),
++            "gel" => array('change' => 300, 'baserank' => 141, 'refrank' => null),    "ite" => array('change' => 300, 'baserank' => 149, 'refrank' => null),
++            "n r" => array('change' => 300, 'baserank' => 30, 'refrank' => null),     "by " => array('change' => 105, 'baserank' => 121, 'refrank' => 226),
++            "d u" => array('change' => 300, 'baserank' => 282, 'refrank' => null),    "clu" => array('change' => 300, 'baserank' => 270, 'refrank' => null),
++            " ur" => array('change' => 300, 'baserank' => 229, 'refrank' => null),    "ebu" => array('change' => 300, 'baserank' => 298, 'refrank' => null),
++            "n i" => array('change' => 300, 'baserank' => 158, 'refrank' => null),    "he " => array('change' => 0, 'baserank' => 2, 'refrank' => 2),
++            " wh" => array('change' => 195, 'baserank' => 232, 'refrank' => 37),      " ph" => array('change' => 300, 'baserank' => 220, 'refrank' => null),
++        );
++        
++        $ranked = $this->x->_arr_rank($this->x->_trigram($str));
++        $results = $this->x->detect($str);
++
++        $count = count($ranked);
++        $sum = 0;
++
++        //foreach ($this->x->_lang_db['english'] as $key => $value) {
++        foreach ($ranked as $key => $value) {
++            if (isset($ranked[$key]) && isset($this->x->_lang_db['english'][$key])) {
++                $difference = abs($this->x->_lang_db['english'][$key] - $ranked[$key]);
++            } else {
++                $difference = 300;
++            }
++
++            $this->assertTrue(isset($true_differences[$key]), "'$key'");
++            if (isset($true_differences[$key])) {
++                $this->assertEquals($true_differences[$key]['change'], $difference, "'$key'");
++            }
++            $sum += $difference;
++        }
++
++        $this->assertEquals(300, $count);
++        $this->assertEquals(59490, $sum);
++
++        $this->assertEquals('english', key($results));
++        $this->assertEquals(198, floor(current($results)));
++        next($results);
++        $this->assertEquals('italian', key($results));
++        $this->assertEquals(228, floor(current($results)));
++    }
++
++    function test_french ()
++    {
++        $this->x->setPerlCompatible();
++        $str = "Verifions que le détecteur de langues marche";
++
++        $trigrams = $this->x->_trigram($str);
++        $this->assertEquals(42, count($trigrams));
++        // verified in Language::Guess
++
++        $ranked = $this->x->_arr_rank($trigrams);
++        $this->assertEquals(0, $ranked['e l']);
++
++        $correct_ranks = array(
++            ' de' => 1,
++            "éte" => 41,
++            "dét" => 12,
++            'fio' => 18,
++            'de ' => 11,
++            'ons' => 28,
++            'ect' => 14,
++            'le ' => 24,
++            'arc' => 8,
++            'lan' => 23,
++            'es ' => 16,
++            'mar' => 25,
++            " dé" => 2,
++            'ifi' => 21,
++            'gue' => 19,
++            'ur ' => 39,
++            'rch' => 31,
++            'ang' => 7,
++            'que' => 29,
++            'ngu' => 26,
++            'e d' => 13,
++            'rif' => 32,
++            ' ma' => 5,
++            'tec' => 35,
++            'ns ' => 27,
++            ' la' => 3,
++            ' le' => 4,
++            'r d' => 30,
++            'e l' => 0,
++            'che' => 9,
++            's m' => 33,
++            'ue ' => 37,
++            'ver' => 40,
++            'teu' => 36,
++            'eri' => 15,
++            'cte' => 10,
++            'ues' => 38,
++            's q' => 34,
++            'eur' => 17,
++            ' qu' => 6,
++            'he ' => 20,
++            'ion' => 22
++        );
++
++
++        $this->assertEquals(count($correct_ranks), count($ranked), "different number of trigrams found");
++
++        $distances = array(
++            ' de' => array('change' => 0, 'baserank' => 1, 'refrank' => 1),
++            'éte' => array('change' => 300, 'baserank' => 41, 'refrank' => null),
++            'dét' => array('change' => 300, 'baserank' => 12, 'refrank' => null),
++            'fio' => array('change' => 300, 'baserank' => 18, 'refrank' => null),
++            'de ' => array('change' => 9, 'baserank' => 11, 'refrank' => 2),
++            'ons' => array('change' => 11, 'baserank' => 28, 'refrank' => 39),
++            'ect' => array('change' => 300, 'baserank' => 14, 'refrank' => null),
++            'le ' => array('change' => 19, 'baserank' => 24, 'refrank' => 5),
++            'arc' => array('change' => 300, 'baserank' => 8, 'refrank' => null),
++            'lan' => array('change' => 300, 'baserank' => 23, 'refrank' => null),
++            'es ' => array('change' => 16, 'baserank' => 16, 'refrank' => 0),
++            'mar' => array('change' => 300, 'baserank' => 25, 'refrank' => null),
++            ' dé' => array('change' => 59, 'baserank' => 2, 'refrank' => 61),
++            'ifi' => array('change' => 300, 'baserank' => 21, 'refrank' => null),
++            'gue' => array('change' => 300, 'baserank' => 19, 'refrank' => null),
++            'ur ' => array('change' => 12, 'baserank' => 39, 'refrank' => 27),
++            'rch' => array('change' => 300, 'baserank' => 31, 'refrank' => null),
++            'ang' => array('change' => 300, 'baserank' => 7, 'refrank' => null),
++            'que' => array('change' => 5, 'baserank' => 29, 'refrank' => 24),
++            'ngu' => array('change' => 300, 'baserank' => 26, 'refrank' => null),
++            'e d' => array('change' => 2, 'baserank' => 13, 'refrank' => 15),
++            'rif' => array('change' => 300, 'baserank' => 32, 'refrank' => null),
++            ' ma' => array('change' => 89, 'baserank' => 5, 'refrank' => 94),
++            'tec' => array('change' => 300, 'baserank' => 35, 'refrank' => null),
++            'ns ' => array('change' => 6, 'baserank' => 27, 'refrank' => 21),
++            ' la' => array('change' => 6, 'baserank' => 3, 'refrank' => 9),
++            ' le' => array('change' => 1, 'baserank' => 4, 'refrank' => 3),
++            'r d' => array('change' => 202, 'baserank' => 30, 'refrank' => 232),
++            'e l' => array('change' => 14, 'baserank' => 0, 'refrank' => 14),
++            'che' => array('change' => 300, 'baserank' => 9, 'refrank' => null),
++            's m' => array('change' => 180, 'baserank' => 33, 'refrank' => 213),
++            'ue ' => array('change' => 7, 'baserank' => 37, 'refrank' => 30),
++            'ver' => array('change' => 117, 'baserank' => 40, 'refrank' => 157),
++            'teu' => array('change' => 300, 'baserank' => 36, 'refrank' => null),
++            'eri' => array('change' => 300, 'baserank' => 15, 'refrank' => null),
++            'cte' => array('change' => 300, 'baserank' => 10, 'refrank' => null),
++            'ues' => array('change' => 237, 'baserank' => 38, 'refrank' => 275),
++            's q' => array('change' => 300, 'baserank' => 34, 'refrank' => null),
++            'eur' => array('change' => 56, 'baserank' => 17, 'refrank' => 73),
++            ' qu' => array('change' => 31, 'baserank' => 6, 'refrank' => 37),
++            'he ' => array('change' => 300, 'baserank' => 20, 'refrank' => null),
++            'ion' => array('change' => 12, 'baserank' => 22, 'refrank' => 10),
++        );
++
++
++
++        $french_ranks = $this->x->_lang_db['french'];
++
++        $sumchange = 0;
++        foreach ($ranked as $key => $value) {
++            if (isset($french_ranks[$key])) {
++                $difference = abs($french_ranks[$key] - $ranked[$key]);
++            } else {
++                $difference = 300;
++            }
++            $this->assertTrue(isset($distances[$key]), $key);
++            if (isset($distances[$key])) {
++                $this->assertEquals($distances[$key]['baserank'], $ranked[$key], "baserank for $key");
++                if ($distances[$key]['refrank'] === null) {
++                    $this->assertArrayNotHasKey($key, $french_ranks);
++                } else {
++                    $this->assertEquals($distances[$key]['refrank'], $french_ranks[$key], "refrank for $key");
++                }
++                $this->assertEquals($distances[$key]['change'], $difference, "difference for $key");
++            }
++
++            $sumchange += $difference;
++        }
++
++        $actual_result = $this->x->_distance($french_ranks, $ranked);
++        $this->assertEquals($sumchange, $actual_result);
++        $this->assertEquals(7091, $actual_result);
++        $this->assertEquals(168, floor($sumchange/count($trigrams)));
++
++        $final_result = $this->x->detect($str);
++        $this->assertEquals(168, floor($final_result['french']));
++        $this->assertEquals(211, $final_result['spanish']);
++    }
++
++    function test_russian ()
++    {
++        $str = 'авай проверить  узнает ли наш угадатель русски язык';
++
++        $this->x->setPerlCompatible();
++        $trigrams = $this->x->_trigram($str);
++        $ranked = $this->x->_arr_rank($trigrams);
++
++        $correct_ranks = array(
++            ' ру' => array('change' => 300, 'baserank' => 3, 'refrank' => null),
++            'ай ' => array('change' => 300, 'baserank' => 10, 'refrank' => null),
++            'ада' => array('change' => 300, 'baserank' => 8, 'refrank' => null),
++            ' пр' => array('change' => 1, 'baserank' => 2, 'refrank' => 1),
++            ' яз' => array('change' => 300, 'baserank' => 6, 'refrank' => null),
++            'ить' => array('change' => 300, 'baserank' => 24, 'refrank' => null),
++            ' на' => array('change' => 1, 'baserank' => 1, 'refrank' => 0),
++            'зна' => array('change' => 153, 'baserank' => 20, 'refrank' => 173),
++            'вай' => array('change' => 300, 'baserank' => 13, 'refrank' => null),
++            'ш у' => array('change' => 300, 'baserank' => 44, 'refrank' => null),
++            'ль ' => array('change' => 300, 'baserank' => 28, 'refrank' => null),
++            ' ли' => array('change' => 300, 'baserank' => 0, 'refrank' => null),
++            'сск' => array('change' => 300, 'baserank' => 37, 'refrank' => null),
++            'ть ' => array('change' => 31, 'baserank' => 40, 'refrank' => 9),
++            'ава' => array('change' => 300, 'baserank' => 7, 'refrank' => null),
++            'про' => array('change' => 18, 'baserank' => 32, 'refrank' => 14),
++            'гад' => array('change' => 300, 'baserank' => 15, 'refrank' => null),
++            'усс' => array('change' => 300, 'baserank' => 43, 'refrank' => null),
++            'ык ' => array('change' => 300, 'baserank' => 45, 'refrank' => null),
++            'ель' => array('change' => 64, 'baserank' => 17, 'refrank' => 81),
++            'язы' => array('change' => 300, 'baserank' => 47, 'refrank' => null),
++            ' уг' => array('change' => 300, 'baserank' => 4, 'refrank' => null),
++            'ате' => array('change' => 152, 'baserank' => 11, 'refrank' => 163),
++            'и н' => array('change' => 63, 'baserank' => 22, 'refrank' => 85),
++            'и я' => array('change' => 300, 'baserank' => 23, 'refrank' => null),
++            'ает' => array('change' => 152, 'baserank' => 9, 'refrank' => 161),
++            'узн' => array('change' => 300, 'baserank' => 42, 'refrank' => null),
++            'ери' => array('change' => 300, 'baserank' => 18, 'refrank' => null),
++            'ли ' => array('change' => 23, 'baserank' => 27, 'refrank' => 4),
++            'т л' => array('change' => 300, 'baserank' => 38, 'refrank' => null),
++            ' уз' => array('change' => 300, 'baserank' => 5, 'refrank' => null),
++            'дат' => array('change' => 203, 'baserank' => 16, 'refrank' => 219),
++            'зык' => array('change' => 300, 'baserank' => 21, 'refrank' => null),
++            'ров' => array('change' => 59, 'baserank' => 34, 'refrank' => 93),
++            'рит' => array('change' => 300, 'baserank' => 33, 'refrank' => null),
++            'ь р' => array('change' => 300, 'baserank' => 46, 'refrank' => null),
++            'ет ' => array('change' => 19, 'baserank' => 19, 'refrank' => 38),
++            'ки ' => array('change' => 116, 'baserank' => 26, 'refrank' => 142),
++            'рус' => array('change' => 300, 'baserank' => 35, 'refrank' => null),
++            'тел' => array('change' => 16, 'baserank' => 39, 'refrank' => 23),
++            'нае' => array('change' => 300, 'baserank' => 29, 'refrank' => null),
++            'й п' => array('change' => 300, 'baserank' => 25, 'refrank' => null),
++            'наш' => array('change' => 300, 'baserank' => 30, 'refrank' => null),
++            'уга' => array('change' => 300, 'baserank' => 41, 'refrank' => null),
++            'ове' => array('change' => 214, 'baserank' => 31, 'refrank' => 245),
++            'ски' => array('change' => 112, 'baserank' => 36, 'refrank' => 148),
++            'вер' => array('change' => 31, 'baserank' => 14, 'refrank' => 45),
++            'аш ' => array('change' => 300, 'baserank' => 12, 'refrank' => null),
++            );
++
++        $this->assertEquals(48, count($ranked));
++
++
++        $russian = $this->x->_lang_db['russian'];
++
++        $sumchange = 0;
++        foreach ($ranked as $key => $value) {
++            if (isset($russian[$key])) {
++                $difference = abs($russian[$key] - $ranked[$key]);
++            } else {
++                $difference = 300;
++            }
++            $this->assertTrue(isset($correct_ranks[$key], $key));
++            if (isset($correct_ranks[$key])) {
++                $this->assertEquals($correct_ranks[$key]['baserank'], $ranked[$key], "baserank for $key");
++                if ($correct_ranks[$key]['refrank'] === null) {
++                    $this->assertArrayNotHasKey($key, $russian);
++                } else {
++                    $this->assertEquals($correct_ranks[$key]['refrank'], $russian[$key], "refrank for $key");
++                }
++                $this->assertEquals($correct_ranks[$key]['change'], $difference, "difference for $key");
++            }
++
++            $sumchange += $difference;
++        }
++
++        $actual_result = $this->x->_distance($russian, $ranked);
++        $this->assertEquals($sumchange, $actual_result);
++        $this->assertEquals(10428, $actual_result);
++        $this->assertEquals(217, floor($sumchange/count($trigrams)));
++
++        $final_result = $this->x->detect($str);
++        $this->assertEquals(217,floor($final_result['russian']));
++    }
++
++    function test_ranker ()
++    {
++        $str = 'is it s i';
++
++        $result = $this->x->_arr_rank($this->x->_trigram($str));
++
++        $this->assertEquals(0, $result['s i']);
++    }
++
++
++    function test_count ()
++    {
++        $langs = $this->x->getLanguages();
++        
++        $count = $this->x->getLanguageCount();
++
++        $this->assertEquals(count($langs), $count);
++
++        foreach ($langs as $lang) {
++            $this->assertTrue($this->x->languageExists($lang), $lang);
++        }
++    }
++
++    function testLanguageExistsNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $this->assertTrue($this->x->languageExists('en'));
++        $this->assertFalse($this->x->languageExists('english'));
++    }
++
++    function testLanguageExistsArrayNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $this->assertTrue($this->x->languageExists(array('en', 'de')));
++        $this->assertFalse($this->x->languageExists(array('en', 'doesnotexist')));
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Unsupported parameter type passed to languageExists()
++     */
++    function testLanguageExistsUnsupportedType()
++    {
++        $this->x->languageExists(1.23);
++    }
++
++    function testGetLanguages()
++    {
++        $langs = $this->x->getLanguages();
++        $this->assertContains('english', $langs);
++        $this->assertContains('swedish', $langs);
++    }
++
++    function testGetLanguagesNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $langs = $this->x->getLanguages();
++        $this->assertContains('en', $langs);
++        $this->assertContains('sv', $langs);
++    }
++
++    function testDetect()
++    {
++        $scores = $this->x->detect('Das ist ein kleiner Text für euch alle');
++        $this->assertInternalType('array', $scores);
++        $this->assertGreaterThan(5, count($scores));
++
++        list($key, $value) = each($scores);
++        $this->assertEquals('german', $key, 'text is german');
++    }
++
++    function testDetectNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $scores = $this->x->detect('Das ist ein kleiner Text für euch alle');
++        list($key, $value) = each($scores);
++        $this->assertEquals('de', $key, 'text is german');
++    }
++
++    function testDetectNameMode2Limit()
++    {
++        $this->x->setNameMode(2);
++        $scores = $this->x->detect('Das ist ein kleiner Text für euch alle', 1);
++        list($key, $value) = each($scores);
++        $this->assertEquals('de', $key, 'text is german');
++    }
++
++    function testDetectSimple()
++    {
++        $lang = $this->x->detectSimple('Das ist ein kleiner Text für euch alle');
++        $this->assertInternalType('string', $lang);
++        $this->assertEquals('german', $lang, 'text is german');
++    }
++
++    function testDetectSimpleNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $lang = $this->x->detectSimple('Das ist ein kleiner Text für euch alle');
++        $this->assertInternalType('string', $lang);
++        $this->assertEquals('de', $lang, 'text is german');
++    }
++
++    function testDetectSimpleNoLanguages()
++    {
++        $this->x->omitLanguages('english', true);
++        $this->x->omitLanguages('english', false);
++        $this->assertNull(
++            $this->x->detectSimple('Das ist ein kleiner Text für euch alle')
++        );
++    }
++
++    function testLanguageSimilarity()
++    {
++        $this->x->setPerlCompatible(true);
++        $eng_dan = $this->x->languageSimilarity('english', 'danish');
++        $nor_dan = $this->x->languageSimilarity('norwegian', 'danish');
++        $swe_dan = $this->x->languageSimilarity('swedish', 'danish');
++
++        // remember, lower means more similar
++        $this->assertTrue($eng_dan > $nor_dan); // english is less similar to danish than norwegian is
++        $this->assertTrue($eng_dan > $swe_dan); // english is less similar to danish than swedish is
++        $this->assertTrue($nor_dan < $swe_dan); // norwegian is more similar to danish than swedish
++
++        // test the range of the results
++        $this->assertTrue($eng_dan <= 300, $eng_dan);
++        $this->assertTrue($eng_dan >= 0, $eng_dan);
++
++        // test it in perl compatible mode
++        $this->x->setPerlCompatible(false);
++
++        $eng_dan = $this->x->languageSimilarity('english', 'danish');
++        $nor_dan = $this->x->languageSimilarity('norwegian', 'danish');
++        $swe_dan = $this->x->languageSimilarity('swedish', 'danish');
++
++        // now higher is more similar
++        $this->assertTrue($eng_dan < $nor_dan);
++        $this->assertTrue($eng_dan < $swe_dan);
++        $this->assertTrue($nor_dan > $swe_dan);
++
++        $this->assertTrue($eng_dan <= 1, $eng_dan);
++        $this->assertTrue($eng_dan >= 0, $eng_dan);
++
++        $this->x->setPerlCompatible(true);
++
++        $eng_all = $this->x->languageSimilarity('english');
++        $this->assertEquals($this->x->getLanguageCount() - 1, count($eng_all));
++        $this->assertTrue(!isset($eng_all['english']));
++
++        $this->assertTrue($eng_all['italian'] < $eng_all['turkish']);
++        $this->assertTrue($eng_all['french'] < $eng_all['kyrgyz']);
++
++        $all = $this->x->languageSimilarity();
++        $this->assertTrue(!isset($all['english']['english']));
++        $this->assertTrue($all['french']['spanish'] < $all['french']['mongolian']);
++        $this->assertTrue($all['spanish']['latin'] < $all['hindi']['finnish']);
++        $this->assertTrue($all['russian']['uzbek'] < $all['russian']['english']);
++    }
++
++
++    function testLanguageSimilarityNameMode2()
++    {
++        $this->x->setNameMode(2);
++        $this->x->setPerlCompatible(true);
++        $eng_dan = $this->x->languageSimilarity('en', 'dk');
++        $nor_dan = $this->x->languageSimilarity('no', 'dk');
++
++        // remember, lower means more similar
++        $this->assertTrue($eng_dan > $nor_dan); // english is less similar to danish than norwegian is
++    }
++
++    function testLanguageSimilarityUnknownLanguage()
++    {
++        $this->assertNull($this->x->languageSimilarity('doesnotexist'));
++    }
++
++    function testLanguageSimilarityUnknownLanguage2()
++    {
++        $this->assertNull($this->x->languageSimilarity('english', 'doesnotexist'));
++    }
++
++    function test_compatibility ()
++    {
++        $str = "I am the very model of a modern major general.";
++
++
++        $this->x->setPerlCompatible(false);
++        $result = $this->x->detectConfidence($str);
++    
++        $this->assertTrue(!is_null($result));
++        $this->assertTrue(is_array($result));
++        extract($result);
++        $this->assertEquals('english', $language);
++        $this->assertTrue($similarity <= 1 && $similarity >= 0, $similarity);
++        $this->assertTrue($confidence <= 1 && $confidence >= 0, $confidence);
++
++        $this->x->setPerlCompatible(true);
++        $result = $this->x->detectConfidence($str);
++        extract($result, EXTR_OVERWRITE);
++    
++        $this->assertEquals('english', $language);
++
++        // technically the lowest possible score is 0 but it's extremely unlikely to hit that
++        $this->assertTrue($similarity <= 300 && $similarity >= 1, $similarity);
++        $this->assertTrue($confidence <= 1 && $confidence >= 0, $confidence);
++
++    }
++
++    function testDetectConfidenceNoText()
++    {
++        $this->assertNull($this->x->detectConfidence(''));
++    }
++
++    function test_omit_error ()
++    {
++        $str = 'On January 29, 1737, Thomas Paine was born in Thetford, England. His father, a corseter, had grand visions for his son, but by the age of 12, Thomas had failed out of school. The young Paine began apprenticing for his father, but again, he failed.';
++
++        $myobj = new Text_LanguageDetect;
++
++        $result = $myobj->detectSimple($str);
++        $this->assertEquals('english', $result);
++
++        // omit all languages and you should get an error
++        $myobj->omitLanguages($myobj->getLanguages());
++
++        $result = $myobj->detectSimple($str);
++
++        $this->assertNull($result, gettype($result));
++    }
++
++    function test_cyrillic ()
++    {
++        // tests whether the cyrillic lower-casing works
++
++        $uppercased = 'А    Б    В    Г    Д    Е    Ж    З    И    Й    К    Л    М    Н    О    П'
++                     . 'Р    С    Т    У    Ф    Х    Ц    Ч    Ш    Щ    Ъ    Ы    Ь    Э    Ю    Я';
++
++        $lowercased = 'а    б    в    г    д    е    ж    з    и    й    к    л    м    н    о    п'
++                    . 'р    с    т    у    ф    х    ц    ч    ш    щ    ъ    ы    ь    э    ю    я';
++
++        $this->assertEquals(strlen($uppercased), strlen($lowercased));
++
++        $i = 0;
++        $j = 0;
++        $new_u = '';
++        while ($i < strlen($uppercased)) {
++            $u = Text_LanguageDetect::_next_char($uppercased, $i, true);
++            $l = Text_LanguageDetect::_next_char($lowercased, $j, true);
++            $this->assertEquals($u, $l);
++
++            $new_u .= $u;
++        }
++
++        $this->assertEquals($i, $j);
++        $this->assertEquals($i, strlen($lowercased));
++        if (function_exists('mb_strtolower')) {
++            $this->assertEquals($new_u, mb_strtolower($uppercased, 'UTF-8'));
++        }
++    }
++
++    function test_block_detection()
++    {
++        $exp_output = <<<EOF
++Array
++(
++    [Basic Latin] => 37
++    [CJK Unified Ideographs] => 2
++    [Hiragana] => 1
++    [Latin-1 Supplement] => 4
++)
++EOF;
++        $teststr = 'lsdkfj あ 葉  叶 slskdfj s Åj;sdklf ÿjs;kdjåf î';
++        $result = $this->x->detectUnicodeBlocks($teststr, false);
++
++        ksort($result);
++        ob_start();
++        print_r($result);
++        $str_result = ob_get_contents();
++        ob_end_clean();
++        $this->assertEquals(trim($exp_output), trim($str_result));
++
++        // test whether skipping the spaces reduces the basic latin count
++        $result2 = $this->x->detectUnicodeBlocks($teststr, true);
++        $this->assertTrue($result2['Basic Latin'] < $result['Basic Latin']);
++
++        $result3 = $this->x->unicodeBlockName('и');
++        $this->assertEquals('Cyrillic', $result3);
++
++        $this->assertEquals('Basic Latin', $this->x->unicodeBlockName('A'));
++
++        // see what happens when you try an unassigned range
++        $utf8 = $this->code2utf(0x0800);
++
++        $this->assertEquals(false, $this->x->unicodeBlockName($utf8));
++
++        // try unicode vals in several different ranges
++        $unicode['Supplementary Private Use Area-A'] = 0xF0001;
++        $unicode['Supplementary Private Use Area-B'] = 0x100001;
++        $unicode['CJK Unified Ideographs Extension B'] = 0x20001;
++        $unicode['Ugaritic'] = 0x10381;
++        $unicode['Gothic'] = 0x10331;
++        $unicode['Low Surrogates'] = 0xDC01;
++        $unicode['CJK Unified Ideographs'] = 0x4E00;
++        $unicode['Glagolitic'] = 0x2C00;
++        $unicode['Latin Extended Additional'] = 0x1EFF;
++        $unicode['Devanagari'] = 0x0900;
++        $unicode['Hebrew'] = 0x0590;
++        $unicode['Latin Extended-B'] = 0x024F;
++        $unicode['Latin-1 Supplement'] = 0x00FF;
++        $unicode['Basic Latin'] = 0x007F;
++
++        foreach ($unicode as $range => $codepoint) {
++            $result = $this->x->unicodeBlockName($this->code2utf($codepoint));
++            $this->assertEquals($range, $result, $codepoint);
++        }
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Pass a single char only to this method
++     */
++    function testUnicodeBlockNameParamString()
++    {
++        $this->x->unicodeBlockName('foo bar baz');
++    }
++
++    /**
++     * @expectedException Text_LanguageDetect_Exception
++     * @expectedExceptionMessage Input must be of type string or int
++     */
++    function testUnicodeBlockNameUnsupportedParamType()
++    {
++        $this->x->unicodeBlockName(1.23);
++    }
++
++
++    // utility function
++    // found in http://www.php.net/manual/en/function.utf8-encode.php#49336
++    function code2utf($num)
++    {
++        if ($num < 128) {
++           return chr($num);
++
++        } elseif ($num < 2048) {
++           return chr(($num >> 6) + 192) . chr(($num & 63) + 128);
++
++        } elseif ($num < 65536) {
++           return chr(($num >> 12) + 224) . chr((($num >> 6) & 63) + 128) . chr(($num & 63) + 128);
++
++        } elseif ($num < 2097152) {
++            return chr(($num >> 18) + 240) . chr((($num >> 12) & 63) + 128) . chr((($num >> 6) & 63) + 128) . chr(($num & 63) + 128);
++        } else {
++            return '';
++        }
++    }
++
++    function test_utf8len()
++    {
++        $str = 'Iñtërnâtiônàlizætiøn';
++        $this->assertEquals(20, $this->x->utf8strlen($str), utf8_decode($str));
++
++        $str = '時期日';
++        $this->assertEquals(3, $this->x->utf8strlen($str), utf8_decode($str));
++    }
++
++    function test_unicode()
++    {
++        // test whether it can get the right unicode values for utf8 chars
++
++        $chars['ת'] = 0x5EA;
++
++        $chars['ç'] = 0x00E7;
++
++        $chars['a'] = 0x0061;
++
++        $chars['Φ'] = 0x03A6;
++
++        $chars['И'] = 0x0418;
++
++        $chars['ڰ'] = 0x6B0;
++
++        $chars['Ụ'] = 0x1EE4;
++
++        $chars['놔'] = 0xB194;
++
++        $chars['遮'] = 0x906E;
++
++        $chars['怀'] = 0x6000;
++
++        $chars['ฤ'] = 0x0E24;
++
++        $chars['Я'] = 0x042F;
++
++        $chars['ü'] = 0x00FC;
++
++        $chars['Đ'] = 0x0110;
++
++        $chars['א'] = 0x05D0;
++        
++
++        foreach ($chars as $utf8 => $unicode) {
++            $this->assertEquals($unicode, $this->x->_utf8char2unicode($utf8), $utf8);
++        }
++    }
++
++    function test_unicode_off()
++    {
++
++        // see what happens when you turn the unicode setting off
++
++        $myobj = new Text_LanguageDetect;
++
++        $str = 'This is a delightful sample of English text';
++
++        $myobj->useUnicodeBlocks(true);
++        $result1 = $myobj->detectConfidence($str);
++
++        $myobj->useUnicodeBlocks(false);
++        $result2 = $myobj->detectConfidence($str);
++
++        $this->assertEquals($result1, $result2);
++        
++        // note this test doesn't tell if unicode narrowing was actually used or not
++    }
++
++
++    function test_detection()
++    {
++
++        // WARNING: the below lines may make your terminal go ape! be warned
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++        // test strings from the test module used by perl's Language::Guess
++
++        $testarr = array(
++            "english" => "This is a test of the language checker",
++            "french" => "Verifions que le détecteur de langues marche",
++            "polish" => "Sprawdźmy, czy odgadywacz języków pracuje",
++            "russian" => "Давай проверим узнает ли нашь угадыватель русский язык",
++            "spanish" => "La respuesta de los acreedores a la oferta argentina para salir del default no ha sido muy positiv",
++            "romanian" => "în acest sens aparţinînd Adunării Generale a organizaţiei, în ciuda faptului că mai multe dintre solicitările organizaţiei privind organizarea scrutinului nu au fost soluţionate",
++            "albanian" => "kaluan ditën e fundit të fushatës në shtetet kryesore për të siguruar sa më shumë votues.",
++            "danish" => "På denne side bringer vi billeder fra de mange forskellige forberedelser til arrangementet, efterhånden som vi får dem ",
++            "swedish" => "Vi säger att Frälsningen är en gåva till alla, fritt och för intet.  Men som vi nämnt så finns det två villkor som måste",
++            "norwegian" => "Nominasjonskomiteen i Akershus KrF har skviset ut Einar Holstad fra stortingslisten. Ytre Enebakk-mannen har plass p Stortinget s lenge Valgerd Svarstad Haugland sitter i",
++            "finnish" => "on julkishallinnon verkkopalveluiden yhteinen osoite. Kansalaisten arkielämää helpottavaa tietoa on koottu eri aihealueisiin",
++            "estonian" => "Ennetamaks reisil ebameeldivaid vahejuhtumeid vii end kurssi reisidokumentide ja viisade reeglitega ning muu praktilise informatsiooniga",
++            "hungarian" => "Hiába jön létre az önkéntes magyar haderő, hiába nem lesz többé bevonulás, változatlanul fennmarad a hadkötelezettség intézménye",
++            "uzbek" => "милиция ва уч солиқ идораси ходимлари яраланган. Шаҳарда хавфсизлик чоралари кучайтирилган.",
++
++
++            "czech" => "Francouzský ministr financí zmírnil výhrady vůči nízkým firemním daním v nových členských státech EU",
++            "dutch" => "Die kritiek was volgens hem bitter hard nodig, omdat Nederland binnen een paar jaar in een soort Belfast zou dreigen te nderen",
++
++            "croatian" => "biće prilično izjednačena, sugerišu najnovije ankete. Oba kandidata tvrde da su sposobni da dobiju rat protiv terorizma",
++
++            "romanian" => "în acest sens aparţinînd Adunării Generale a organizaţiei, în ciuda faptului că mai multe dintre solicitările organizaţiei ivind organizarea scrutinului nu au fost soluţionate",
++            
++            "turkish" => "yakın tarihin en çekişmeli başkanlık seçiminde oy verme işlemi sürerken, katılımda rekor bekleniyor.",
++
++            "kyrgyz" => "көрбөгөндөй элдик толкундоо болуп, Кокон шаарынын көчөлөрүндө бир нече миң киши нааразылык билдирди.",
++
++
++            "albanian" => "kaluan ditën e fundit të fushatës në shtetet kryesore për të siguruar sa më shumë votues.",
++
++
++             "azeri" => "Daxil olan xəbərlərdə deyilir ki, 6 nəfər Bağdadın mərkəzində yerləşən Təhsil Nazirliyinin binası yaxınlığında baş vermiş partlayış zamanı həlak olub.",
++
++
++             "macedonian" => "на јавното мислење покажуваат дека трката е толку тесна, што се очекува двајцата соперници да ја прекршат традицијата и да се појават и на самиот изборен ден.",
++            
++
++
++             "kazakh" => "Сайлау нәтижесінде дауыстардың басым бөлігін ел премьер министрі Виктор Янукович пен оның қарсыласы, оппозиция жетекшісі Виктор Ющенко алды.",
++
++
++             "bulgarian" => " е готов да даде гаранции, че няма да прави ядрено оръжие, ако му се разреши мирна атомна програма",
++
++
++             "arabic" => " ملايين الناخبين الأمريكيين يدلون بأصواتهم وسط إقبال قياسي على انتخابات هي الأشد تنافسا منذ عقود",
++
++        );
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++        // should be safe at this point
++
++
++        $languages = $this->x->getLanguages();
++        foreach (array_keys($testarr) as $key) {
++            $this->assertTrue(in_array($key, $languages), "$key was not in known languages");
++        }
++
++        foreach ($testarr as $key=>$value) {
++            $this->assertEquals($key, $this->x->detectSimple($value));
++        }
++    }
++
++
++    public function test_convertFromNameMode0()
++    {
++        $this->assertEquals(
++            'english',
++            $this->x->_convertFromNameMode('english')
++        );
++    }
++
++    public function test_convertFromNameMode2String()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            'english',
++            $this->x->_convertFromNameMode('en')
++        );
++    }
++
++    public function test_convertFromNameMode3String()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            'english',
++            $this->x->_convertFromNameMode('eng')
++        );
++    }
++
++    public function test_convertFromNameMode2ArrayVal()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            array('english', 'german'),
++            $this->x->_convertFromNameMode(array('en', 'de'))
++        );
++    }
++
++    public function test_convertFromNameMode2ArrayKey()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            array('english' => 'foo', 'german' => 'test'),
++            $this->x->_convertFromNameMode(
++                array('en' => 'foo', 'de' => 'test'),
++                true
++            )
++        );
++    }
++
++    public function test_convertFromNameMode3ArrayVal()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            array('english', 'german'),
++            $this->x->_convertFromNameMode(array('eng', 'deu'))
++        );
++    }
++
++    public function test_convertFromNameMode3ArrayKey()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            array('english' => 'foo', 'german' => 'test'),
++            $this->x->_convertFromNameMode(
++                array('eng' => 'foo', 'deu' => 'test'),
++                true
++            )
++        );
++    }
++
++    public function test_convertToNameMode0()
++    {
++        $this->assertEquals(
++            'english',
++            $this->x->_convertToNameMode('english')
++        );
++    }
++
++    public function test_convertToNameMode2String()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            'en',
++            $this->x->_convertToNameMode('english')
++        );
++    }
++
++    public function test_convertToNameMode3String()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            'eng',
++            $this->x->_convertToNameMode('english')
++        );
++    }
++
++    public function test_convertToNameMode2ArrayVal()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            array('en', 'de'),
++            $this->x->_convertToNameMode(array('english', 'german'))
++        );
++    }
++
++    public function test_convertToNameMode2ArrayKey()
++    {
++        $this->x->setNameMode(2);
++        $this->assertEquals(
++            array('en' => 'foo', 'de' => 'test'),
++            $this->x->_convertToNameMode(
++                array('english' => 'foo', 'german' => 'test'),
++                true
++            )
++        );
++    }
++
++    public function test_convertToNameMode3ArrayVal()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            array('eng', 'deu'),
++            $this->x->_convertToNameMode(array('english', 'german'))
++        );
++    }
++
++    public function test_convertToNameMode3ArrayKey()
++    {
++        $this->x->setNameMode(3);
++        $this->assertEquals(
++            array('eng' => 'foo', 'deu' => 'test'),
++            $this->x->_convertToNameMode(
++                array('english' => 'foo', 'german' => 'test'),
++                true
++            )
++        );
++    }
++}
